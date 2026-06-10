@@ -1,36 +1,78 @@
 import * as THREE from "three";
 import type { Collider } from "./house";
+import { drawAustralianFlag, drawNamePlate, drawStatuePlaque } from "./lake-art";
 
-// The lake behind (east of) Tycoon House, centered ~(35, 26), with the
-// Tycoon Yatch moored in the middle and a statue of a boy on the shore.
+// The lake behind (east of) Tycoon House — now ~25x23, centered (36.5, 26) —
+// with the very large Tycoon Yatch moored mid-water and a statue on shore.
 
-function drawNamePlate(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = "#10243f";
-  ctx.fillRect(0, 0, 256, 48);
-  ctx.strokeStyle = "#d4af37";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(3, 3, 250, 42);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#f0e6d2";
-  ctx.font = "bold 24px serif";
-  ctx.fillText("TYCOON YATCH", 128, 32);
-}
+const WATER_VERTEX = /* glsl */ `
+  uniform float uTime;
+  varying vec2 vUv;
+  varying vec3 vWorld;
 
-function drawStatuePlaque(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = "#6e5a2e";
-  ctx.fillRect(0, 0, 256, 64);
-  ctx.strokeStyle = "#d4af37";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(4, 4, 248, 56);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#f0e6c8";
-  ctx.font = "bold 21px serif";
-  ctx.fillText("Statue of the Tycoon", 128, 40);
-}
+  void main() {
+    vUv = uv;
+    vec3 pos = position;
+    pos.y += sin(pos.x * 0.7 + uTime) * 0.035
+           + cos(pos.z * 0.9 + uTime * 1.3) * 0.035;
+    vec4 world = modelMatrix * vec4(pos, 1.0);
+    vWorld = world.xyz;
+    gl_Position = projectionMatrix * viewMatrix * world;
+  }
+`;
+
+const WATER_FRAGMENT = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uDeep;
+  uniform vec3 uShallow;
+  varying vec2 vUv;
+  varying vec3 vWorld;
+
+  void main() {
+    float dist = length((vUv - 0.5) * 2.0);
+    if (dist > 1.0) discard;
+
+    float ripple = sin(vWorld.x * 1.6 + uTime * 0.9)
+                 * sin(vWorld.z * 1.9 - uTime * 1.1);
+    float swell = sin((vWorld.x + vWorld.z) * 0.7 + uTime * 0.6);
+
+    vec3 color = mix(uShallow, uDeep, smoothstep(0.1, 0.85, 1.0 - dist));
+    color += vec3(0.10, 0.14, 0.16) * ripple * 0.4 + vec3(0.04) * swell;
+    float glint = pow(max(0.0, ripple * swell), 8.0);
+    color += vec3(0.55, 0.6, 0.55) * glint;
+
+    float edgeFade = smoothstep(1.0, 0.94, dist);
+    gl_FragColor = vec4(color, edgeFade * 0.96);
+  }
+`;
+
+const FLAG_VERTEX = /* glsl */ `
+  uniform float uTime;
+  varying vec2 vUv;
+
+  void main() {
+    vUv = uv;
+    vec3 pos = position;
+    // Pinned at the hoist, waving toward the fly.
+    pos.z += sin(pos.x * 5.0 - uTime * 5.0) * 0.08 * uv.x;
+    pos.y += sin(pos.x * 3.0 - uTime * 3.4) * 0.03 * uv.x;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
+
+const FLAG_FRAGMENT = /* glsl */ `
+  uniform sampler2D uMap;
+  varying vec2 vUv;
+
+  void main() {
+    gl_FragColor = texture2D(uMap, vUv);
+  }
+`;
 
 export function buildLake(): {
   group: THREE.Group;
   colliders: Collider[];
+  update: (delta: number) => void;
   dispose: () => void;
 } {
   const group = new THREE.Group();
@@ -38,20 +80,35 @@ export function buildLake(): {
   const disposables: { dispose: () => void }[] = [];
 
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
-  const whiteMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf2f2ee,
-    roughness: 0.35,
+  const hullWhiteMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf6f5f0,
+    roughness: 0.25,
+    metalness: 0.1,
+  });
+  const hullNavyMaterial = new THREE.MeshStandardMaterial({
+    color: 0x16243c,
+    roughness: 0.3,
+    metalness: 0.3,
+  });
+  const goldMaterial = new THREE.MeshStandardMaterial({
+    color: 0xc9a44a,
+    metalness: 0.85,
+    roughness: 0.25,
   });
   const glassMaterial = new THREE.MeshStandardMaterial({
-    color: 0x14181f,
-    metalness: 0.4,
-    roughness: 0.15,
+    color: 0x1a2530,
+    metalness: 0.5,
+    roughness: 0.1,
   });
+  const teakMaterial = new THREE.MeshStandardMaterial({ color: 0x9a7b52 });
   const stoneMaterial = new THREE.MeshStandardMaterial({
     color: 0xb8b4a8,
     roughness: 0.9,
   });
-  disposables.push(unitBox, whiteMaterial, glassMaterial, stoneMaterial);
+  disposables.push(
+    unitBox, hullWhiteMaterial, hullNavyMaterial, goldMaterial,
+    glassMaterial, teakMaterial, stoneMaterial,
+  );
 
   const box = (
     material: THREE.Material,
@@ -68,85 +125,166 @@ export function buildLake(): {
     return mesh;
   };
 
-  // --- The lake: a large flat disc of water with a sandy rim ---
-  const rimGeometry = new THREE.CircleGeometry(10.9, 48).rotateX(-Math.PI / 2);
+  // --- The lake: sandy rim + shader water with moving ripples ---
+  const rimGeometry = new THREE.CircleGeometry(13.4, 56).rotateX(-Math.PI / 2);
   const rimMaterial = new THREE.MeshStandardMaterial({ color: 0xc9b98a });
   const rim = new THREE.Mesh(rimGeometry, rimMaterial);
-  rim.position.set(35, -0.006, 26);
-  rim.scale.set(1.05, 1, 0.95);
+  rim.position.set(36.5, -0.006, 26);
+  rim.scale.set(1, 1, 0.91);
   rim.receiveShadow = true;
   group.add(rim);
-  const waterGeometry = new THREE.CircleGeometry(10.4, 48).rotateX(-Math.PI / 2);
-  const waterMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1e4f6e,
-    roughness: 0.12,
-    metalness: 0.15,
+  disposables.push(rimGeometry, rimMaterial);
+
+  const waterGeometry = new THREE.PlaneGeometry(25.2, 22.8, 48, 44).rotateX(
+    -Math.PI / 2,
+  );
+  const waterMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDeep: { value: new THREE.Color(0x10384f) },
+      uShallow: { value: new THREE.Color(0x2e7390) },
+    },
+    vertexShader: WATER_VERTEX,
+    fragmentShader: WATER_FRAGMENT,
+    transparent: true,
   });
   const water = new THREE.Mesh(waterGeometry, waterMaterial);
-  water.position.set(35, 0.002, 26);
-  water.scale.set(1.05, 1, 0.95);
-  water.receiveShadow = true;
+  water.position.set(36.5, 0.03, 26);
   group.add(water);
-  disposables.push(rimGeometry, rimMaterial, waterGeometry, waterMaterial);
+  disposables.push(waterGeometry, waterMaterial);
 
   // No walking on water: AABB strips tiling the ellipse.
   colliders.push(
-    { minX: 28, maxX: 42, minZ: 16.8, maxZ: 20 },
-    { minX: 25.2, maxX: 44.8, minZ: 20, maxZ: 24 },
-    { minX: 24.2, maxX: 45.8, minZ: 24, maxZ: 28 },
-    { minX: 25.2, maxX: 44.8, minZ: 28, maxZ: 32 },
-    { minX: 28, maxX: 42, minZ: 32, maxZ: 35.2 },
+    { minX: 29, maxX: 44, minZ: 15.2, maxZ: 19 },
+    { minX: 25.5, maxX: 47.5, minZ: 19, maxZ: 23 },
+    { minX: 24.2, maxX: 48.8, minZ: 23, maxZ: 29 },
+    { minX: 25.5, maxX: 47.5, minZ: 29, maxZ: 33 },
+    { minX: 29, maxX: 44, minZ: 33, maxZ: 36.8 },
   );
 
-  // --- The Tycoon Yatch: hull, pointed bow, two decks, bridge, radar ---
+  // --- The Tycoon Yatch, superyacht edition (~18 units stem to stern) ---
   const yacht = new THREE.Group();
-  yacht.position.set(35.5, 0, 26);
+  yacht.position.set(37, 0, 26);
   yacht.rotation.y = 0.5;
 
-  box(whiteMaterial, yacht, 0, 0.5, 0.6, 2.8, 0.75, 8.2); // hull
-  const bowGeometry = new THREE.ConeGeometry(1.45, 2.6, 4)
-    .rotateX(-Math.PI / 2)
-    .rotateZ(Math.PI / 4);
-  const bow = new THREE.Mesh(bowGeometry, whiteMaterial);
-  bow.scale.set(0.95, 0.26, 1);
-  bow.position.set(0, 0.5, -4.7);
+  box(hullNavyMaterial, yacht, 0, 0.32, 0, 4.2, 0.6, 14); // lower hull
+  box(hullWhiteMaterial, yacht, 0, 0.9, 0, 4.4, 0.58, 14.4); // upper hull
+  box(goldMaterial, yacht, 0, 0.62, 0, 4.45, 0.05, 14.45); // waterline stripe
+  // Rounded bow: a squashed smooth cone.
+  const bowGeometry = new THREE.ConeGeometry(2.2, 4.4, 24).rotateX(-Math.PI / 2);
+  const bow = new THREE.Mesh(bowGeometry, hullWhiteMaterial);
+  bow.scale.set(0.98, 0.2, 1);
+  bow.position.set(0, 0.75, -9.1);
   bow.castShadow = true;
   yacht.add(bow);
   disposables.push(bowGeometry);
+  // Rounded stern.
+  const sternGeometry = new THREE.CylinderGeometry(2.18, 2.18, 1.16, 24, 1, false, 0, Math.PI);
+  const stern = new THREE.Mesh(sternGeometry, hullWhiteMaterial);
+  stern.scale.set(1, 1, 0.7);
+  stern.position.set(0, 0.61, 7.2);
+  stern.castShadow = true;
+  yacht.add(stern);
+  disposables.push(sternGeometry);
 
-  box(whiteMaterial, yacht, 0, 1.15, 1.1, 2.4, 0.6, 5.4); // main deck
-  box(glassMaterial, yacht, 0, 1.15, -1.72, 2.0, 0.4, 0.06); // deck glazing
-  box(whiteMaterial, yacht, 0, 1.72, 1.6, 1.9, 0.55, 3.6); // upper deck
-  box(glassMaterial, yacht, 0, 2.25, 0.7, 1.5, 0.42, 1.3); // bridge
-  box(whiteMaterial, yacht, 0, 2.52, 0.7, 1.6, 0.08, 1.5); // bridge roof
-  const mastGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8);
-  const mast = new THREE.Mesh(mastGeometry, whiteMaterial);
-  mast.position.set(0, 2.9, 0.7);
+  // Decks stepping back, wrapped in dark glazing with gold trim.
+  box(teakMaterial, yacht, 0, 1.22, 0.2, 3.9, 0.06, 13.4); // teak main deck
+  box(hullWhiteMaterial, yacht, 0, 1.62, 0.8, 3.6, 0.75, 9.6);
+  box(glassMaterial, yacht, 0, 1.68, 0.8, 3.66, 0.34, 9.0);
+  box(goldMaterial, yacht, 0, 2.01, 0.8, 3.68, 0.04, 9.65);
+  box(hullWhiteMaterial, yacht, 0, 2.32, 1.5, 2.9, 0.68, 6.6);
+  box(glassMaterial, yacht, 0, 2.36, 1.5, 2.96, 0.3, 6.1);
+  box(goldMaterial, yacht, 0, 2.67, 1.5, 2.98, 0.04, 6.65);
+  // Bridge with raked windshield and flying roof.
+  box(glassMaterial, yacht, 0, 2.95, 0.7, 2.2, 0.55, 2.6);
+  const windshield = box(glassMaterial, yacht, 0, 2.95, -0.85, 2.1, 0.1, 1.3);
+  windshield.rotation.x = -0.45;
+  box(hullWhiteMaterial, yacht, 0, 3.28, 0.9, 2.6, 0.1, 3.4);
+  // Radar arch, mast, and dome.
+  const archLeft = box(hullWhiteMaterial, yacht, -1.0, 3.6, 2.4, 0.12, 0.65, 0.5);
+  archLeft.rotation.z = 0.25;
+  const archRight = box(hullWhiteMaterial, yacht, 1.0, 3.6, 2.4, 0.12, 0.65, 0.5);
+  archRight.rotation.z = -0.25;
+  box(hullWhiteMaterial, yacht, 0, 3.92, 2.4, 2.0, 0.1, 0.5);
+  const domeGeometry = new THREE.SphereGeometry(0.18, 14, 10);
+  const dome = new THREE.Mesh(domeGeometry, hullWhiteMaterial);
+  dome.position.set(0, 4.1, 2.4);
+  yacht.add(dome);
+  disposables.push(domeGeometry);
+  const mastGeometry = new THREE.CylinderGeometry(0.035, 0.05, 0.9, 8);
+  const mast = new THREE.Mesh(mastGeometry, goldMaterial);
+  mast.position.set(0, 4.3, 2.1);
   yacht.add(mast);
   disposables.push(mastGeometry);
-  box(glassMaterial, yacht, 0, 3.2, 0.7, 0.7, 0.06, 0.12); // radar bar
 
-  // Name plates on both sides of the hull, near the stern.
+  // Gold deck railings and foredeck details.
+  box(goldMaterial, yacht, -1.86, 1.55, 0.2, 0.05, 0.2, 12.8);
+  box(goldMaterial, yacht, 1.86, 1.55, 0.2, 0.05, 0.2, 12.8);
+  box(goldMaterial, yacht, 0, 1.55, 7.05, 3.7, 0.2, 0.05);
+  for (const lx of [-0.8, 0.4]) {
+    const lounger = box(hullWhiteMaterial, yacht, lx, 1.32, -5.2, 0.6, 0.14, 1.5);
+    lounger.rotation.y = 0.12;
+  }
+  const tubGeometry = new THREE.CylinderGeometry(0.85, 0.85, 0.34, 20);
+  const tub = new THREE.Mesh(tubGeometry, hullWhiteMaterial);
+  tub.position.set(0, 2.1, 5.6);
+  yacht.add(tub);
+  const tubWaterGeometry = new THREE.CircleGeometry(0.72, 20).rotateX(-Math.PI / 2);
+  const tubWaterMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3aa8c9,
+    roughness: 0.1,
+  });
+  const tubWater = new THREE.Mesh(tubWaterGeometry, tubWaterMaterial);
+  tubWater.position.set(0, 2.28, 5.6);
+  yacht.add(tubWater);
+  disposables.push(tubGeometry, tubWaterGeometry, tubWaterMaterial);
+
+  // Name plates: both sides of the hull and the stern.
   const plateCanvas = document.createElement("canvas");
   plateCanvas.width = 256;
   plateCanvas.height = 48;
   drawNamePlate(plateCanvas.getContext("2d")!);
   const plateTexture = new THREE.CanvasTexture(plateCanvas);
   const plateMaterial = new THREE.MeshStandardMaterial({ map: plateTexture });
-  const plateGeometry = new THREE.PlaneGeometry(2.0, 0.38);
+  const plateGeometry = new THREE.PlaneGeometry(3.0, 0.55);
   disposables.push(plateTexture, plateMaterial, plateGeometry);
   for (const side of [1, -1]) {
     const plate = new THREE.Mesh(plateGeometry, plateMaterial);
-    plate.position.set(side * 1.41, 0.55, 2.6);
+    plate.position.set(side * 2.21, 0.9, 4.2);
     plate.rotation.y = (side * Math.PI) / 2;
     yacht.add(plate);
   }
-  const stern = new THREE.Mesh(plateGeometry, plateMaterial);
-  stern.position.set(0, 0.55, 4.71);
-  yacht.add(stern);
-  group.add(yacht);
+  const sternPlate = new THREE.Mesh(plateGeometry, plateMaterial);
+  sternPlate.position.set(0, 0.9, 8.74);
+  yacht.add(sternPlate);
 
-  // --- Statue of a boy on the shore, in front of the lake ---
+  // Australian flag on a stern pole, waving in the shader breeze.
+  const poleGeometry = new THREE.CylinderGeometry(0.03, 0.04, 1.7, 8);
+  const pole = new THREE.Mesh(poleGeometry, goldMaterial);
+  pole.position.set(0, 2.1, 7.9);
+  pole.rotation.x = 0.25; // raked aft, ensign style
+  yacht.add(pole);
+  disposables.push(poleGeometry);
+  const flagCanvas = document.createElement("canvas");
+  flagCanvas.width = 256;
+  flagCanvas.height = 128;
+  drawAustralianFlag(flagCanvas.getContext("2d")!);
+  const flagTexture = new THREE.CanvasTexture(flagCanvas);
+  const flagMaterial = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uMap: { value: flagTexture } },
+    vertexShader: FLAG_VERTEX,
+    fragmentShader: FLAG_FRAGMENT,
+    side: THREE.DoubleSide,
+  });
+  const flagGeometry = new THREE.PlaneGeometry(1.4, 0.75, 18, 8);
+  const flag = new THREE.Mesh(flagGeometry, flagMaterial);
+  flag.position.set(0.72, 2.85, 8.1);
+  group.add(yacht);
+  flag.rotation.y = 0; // trails to starboard with the breeze
+  yacht.add(flag);
+  disposables.push(flagTexture, flagMaterial, flagGeometry);
+
+  // --- Statue of the boy Tycoon on the shore ---
   const statue = new THREE.Group();
   statue.position.set(23.5, 0, 22.8);
   statue.rotation.y = Math.PI / 2; // gazing out over the water
@@ -178,7 +316,7 @@ export function buildLake(): {
   armUp.position.set(0.21, 1.28, 0.06);
   armUp.rotation.z = -2.4; // raised, waving at the yacht
   statue.add(armUp);
-  // Brass plaque on the pedestal, facing the house.
+  // One plaque per pedestal face.
   const plaqueCanvas = document.createElement("canvas");
   plaqueCanvas.width = 256;
   plaqueCanvas.height = 64;
@@ -187,7 +325,6 @@ export function buildLake(): {
   const plaqueMaterial = new THREE.MeshStandardMaterial({ map: plaqueTexture });
   const plaqueGeometry = new THREE.PlaneGeometry(0.66, 0.165);
   disposables.push(plaqueTexture, plaqueMaterial, plaqueGeometry);
-  // One plaque per pedestal face.
   const plaqueSides: [number, number, number][] = [
     [0, -0.43, Math.PI],
     [0, 0.43, 0],
@@ -203,9 +340,21 @@ export function buildLake(): {
   group.add(statue);
   colliders.push({ minX: 23.05, maxX: 23.95, minZ: 22.35, maxZ: 23.25 });
 
+  let time = 0;
+  const update = (delta: number) => {
+    time += delta;
+    waterMaterial.uniforms.uTime.value = time;
+    flagMaterial.uniforms.uTime.value = time;
+    // A gentle ride at anchor.
+    yacht.position.y = Math.sin(time * 0.6) * 0.05;
+    yacht.rotation.x = Math.sin(time * 0.5) * 0.008;
+    yacht.rotation.z = Math.sin(time * 0.43 + 1) * 0.012;
+  };
+
   return {
     group,
     colliders,
+    update,
     dispose: () => disposables.forEach((d) => d.dispose()),
   };
 }
