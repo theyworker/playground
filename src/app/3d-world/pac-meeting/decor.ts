@@ -88,7 +88,7 @@ export function buildDecor(): {
     roughness: 1,
   });
   const roundRug = new THREE.Mesh(rugRoundGeometry, rugRoundMaterial);
-  roundRug.position.set(-6, 0.01, 3.5);
+  roundRug.position.set(-6.5, 0.01, 4.5);
   roundRug.receiveShadow = true;
   group.add(roundRug);
   disposables.push(rugRoundGeometry, rugRoundMaterial);
@@ -99,12 +99,12 @@ export function buildDecor(): {
     roughness: 1,
   });
   const bedroomRug = new THREE.Mesh(rugRectGeometry, rugRectMaterial);
-  bedroomRug.position.set(8, 0.01, -3.6);
+  bedroomRug.position.set(10.5, 0.01, -5);
   bedroomRug.receiveShadow = true;
   group.add(bedroomRug);
   const hallwayRug = new THREE.Mesh(rugRectGeometry, rugRectMaterial.clone());
   (hallwayRug.material as THREE.MeshStandardMaterial).color.set(0xa44a3f);
-  hallwayRug.position.set(2, 0.01, -3.5);
+  hallwayRug.position.set(6.5, 0.01, -4.8);
   hallwayRug.rotation.y = Math.PI / 2;
   hallwayRug.receiveShadow = true;
   group.add(hallwayRug);
@@ -132,10 +132,10 @@ export function buildDecor(): {
     box(curtainMaterial, window, 0.95, -0.05, 0.14, 0.4, 1.65, 0.07);
     group.add(window);
   };
-  addWindow(-5, -7.8, 0); // north wall, living area
-  addWindow(7, -7.8, 0); // north wall, bedroom
-  addWindow(-10.8, 2, Math.PI / 2); // west wall, lounge
-  addWindow(3, 7.8, Math.PI); // south wall
+  addWindow(-6, -9.8, 0); // north wall, living area
+  addWindow(9, -9.8, 0); // north wall, bedroom
+  addWindow(-13.8, 2, Math.PI / 2); // west wall, lounge
+  addWindow(-5, 9.8, Math.PI); // south wall
 
   // --- Bookshelves with colored books (solid) ---
   const bookPalette = [0xb04a4a, 0x4a6fb0, 0x4ab06f, 0xb0974a, 0x7d5ba6].map(
@@ -180,13 +180,48 @@ export function buildDecor(): {
       maxZ: z + halfD,
     });
   };
-  addBookshelf(-9, -7.5, 0); // against north wall, kitchen side
-  addBookshelf(10.6, 2.5, -Math.PI / 2); // against east wall, lounge
+  addBookshelf(-12, -9.5, 0); // against north wall, kitchen side
+  addBookshelf(13.6, 1, -Math.PI / 2); // against east wall, lounge
+
+  // --- Pettagama: traditional Sri Lankan teak storage chest (solid) ---
+  // Dark carved-wood body on stub feet, domed lid, brass studwork.
+  const teakMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3e2410,
+    roughness: 0.55,
+  });
+  const brassMaterial = new THREE.MeshStandardMaterial({
+    color: 0xc9962e,
+    metalness: 0.85,
+    roughness: 0.3,
+  });
+  const studGeometry = new THREE.SphereGeometry(0.025, 8, 8);
+  disposables.push(teakMaterial, brassMaterial, studGeometry);
+
+  const pettagama = new THREE.Group();
+  pettagama.position.set(-13.25, 0, 0);
+  pettagama.rotation.y = Math.PI / 2;
+  box(teakMaterial, pettagama, 0, 0.5, 0, 1.9, 0.7, 0.85); // body
+  box(teakMaterial, pettagama, 0, 0.93, 0, 1.96, 0.16, 0.91); // lid base
+  box(teakMaterial, pettagama, 0, 1.05, 0, 1.7, 0.1, 0.65); // lid dome
+  for (const [footX, footZ] of [[-0.85, -0.32], [0.85, -0.32], [-0.85, 0.32], [0.85, 0.32]]) {
+    box(teakMaterial, pettagama, footX, 0.08, footZ, 0.16, 0.16, 0.16);
+  }
+  box(brassMaterial, pettagama, 0, 0.62, 0.44, 0.18, 0.26, 0.04); // lock plate
+  // Brass stud rows across the front face.
+  for (const studY of [0.32, 0.72]) {
+    for (let studX = -0.8; studX <= 0.81; studX += 0.2) {
+      const stud = new THREE.Mesh(studGeometry, brassMaterial);
+      stud.position.set(studX, studY, 0.43);
+      pettagama.add(stud);
+    }
+  }
+  group.add(pettagama);
+  colliders.push({ minX: -13.75, maxX: -12.75, minZ: -1, maxZ: 1 });
 
   // --- Trash can (solid) ---
   const canGeometry = new THREE.CylinderGeometry(0.26, 0.22, 0.62, 20);
   const can = new THREE.Mesh(canGeometry, metalMaterial);
-  can.position.set(-8.2, 0.31, -4.9);
+  can.position.set(-10.6, 0.31, -6.5);
   can.castShadow = true;
   can.receiveShadow = true;
   group.add(can);
@@ -194,10 +229,10 @@ export function buildDecor(): {
     Math.PI / 2,
   );
   const rim = new THREE.Mesh(rimGeometry, metalMaterial);
-  rim.position.set(-8.2, 0.62, -4.9);
+  rim.position.set(-10.6, 0.62, -6.5);
   group.add(rim);
   disposables.push(canGeometry, rimGeometry);
-  colliders.push({ minX: -8.5, maxX: -7.9, minZ: -5.2, maxZ: -4.6 });
+  colliders.push({ minX: -10.9, maxX: -10.3, minZ: -6.8, maxZ: -6.2 });
 
   return {
     group,

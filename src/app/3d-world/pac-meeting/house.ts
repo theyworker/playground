@@ -25,7 +25,7 @@ export function buildHouse(): {
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
   disposables.push(wallMaterial, floorMaterial, accentMaterial, woodMaterial, unitBox);
 
-  const floorGeometry = new THREE.PlaneGeometry(22, 16).rotateX(-Math.PI / 2);
+  const floorGeometry = new THREE.PlaneGeometry(28, 20).rotateX(-Math.PI / 2);
   const floor = new THREE.Mesh(floorGeometry, floorMaterial);
   floor.receiveShadow = true;
   group.add(floor);
@@ -58,29 +58,34 @@ export function buildHouse(): {
   const addWall = (x: number, z: number, width: number, depth: number) =>
     addBox(wallMaterial, x, z, width, depth, WALL_HEIGHT);
 
-  // Outer shell (22 x 16, centered at origin).
-  addWall(0, -8, 22, WALL_THICKNESS); // north
-  addWall(0, 8, 22, WALL_THICKNESS); // south
-  addWall(-11, 0, WALL_THICKNESS, 16); // west
-  addWall(11, 0, WALL_THICKNESS, 16); // east
+  // Outer shell (28 x 20, centered at origin).
+  addWall(0, -10, 28, WALL_THICKNESS); // north
+  // South wall, split by the main entrance (gap x 1.5..3.5).
+  addWall(-6.25, 10, 15.5, WALL_THICKNESS);
+  addWall(8.75, 10, 10.5, WALL_THICKNESS);
+  addWall(-14, 0, WALL_THICKNESS, 20); // west
+  addWall(14, 0, WALL_THICKNESS, 20); // east
 
-  // Interior: bedroom in the NE corner, kitchen nook in the west.
-  // Vertical wall at x=3 from the north wall, door gap around z=-1.5.
-  addWall(3, -5.9, WALL_THICKNESS, 4.2);
-  addWall(3, -0.3, WALL_THICKNESS, 2.2);
-  // Horizontal wall at z=-1.6 from the east wall, door gap around x=4.5.
-  addWall(8.7, -1.6, 4.6, WALL_THICKNESS);
+  // Bedroom, NE corner. Vertical wall at x=5 with a door gap z=-5.4..-4.2,
+  // horizontal wall at z=-2 with a door gap x=5..8.
+  addWall(5, -7.7, WALL_THICKNESS, 4.6);
+  addWall(5, -2.1, WALL_THICKNESS, 4.2);
+  addWall(11, -2, 6, WALL_THICKNESS);
+
+  // Walk-in closet, SE corner. Entrance gap x=7..9 on its north wall.
+  addWall(7, 7, WALL_THICKNESS, 6);
+  addWall(11.5, 4, 5, WALL_THICKNESS);
 
   // Furniture (all simple boxes, all solid).
-  addBox(woodMaterial, -6.5, -5, 3.2, 1.6, 0.8); // kitchen counter
-  addBox(woodMaterial, -6, 3.5, 2.4, 2.4, 0.55); // living table
-  addBox(accentMaterial, -1.5, 6.2, 3.4, 1.1, 0.7); // couch
-  addBox(accentMaterial, 8, -6.3, 2.2, 2.8, 0.5); // bed
-  addBox(woodMaterial, 10, -3.4, 1, 1, 0.9); // nightstand
-  addBox(woodMaterial, 9.5, 6.3, 1.8, 1, 1.6); // bookshelf
+  addBox(woodMaterial, -8.5, -6.5, 3.2, 1.6, 0.8); // kitchen counter
+  addBox(woodMaterial, -7, 4.5, 2.4, 2.4, 0.55); // living table
+  addBox(accentMaterial, -2, 8, 3.4, 1.1, 0.7); // couch
+  addBox(accentMaterial, 10.5, -8.2, 2.2, 2.8, 0.5); // bed
+  addBox(woodMaterial, 13, -4.5, 1, 1, 0.9); // nightstand
+  addBox(woodMaterial, 12.5, -8.8, 1.8, 1, 1.6); // bedroom bookshelf
 
   // Emergency meeting button — the pac-meeting centerpiece.
-  addBox(wallMaterial, 2, 3.5, 1.2, 1.2, 0.7);
+  addBox(wallMaterial, 2.5, 4.5, 1.2, 1.2, 0.7);
   const buttonGeometry = new THREE.CylinderGeometry(0.32, 0.32, 0.12, 24);
   const buttonMaterial = new THREE.MeshStandardMaterial({
     color: 0xd22f27,
@@ -88,7 +93,7 @@ export function buildHouse(): {
     roughness: 0.3,
   });
   const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-  button.position.set(2, 0.76, 3.5);
+  button.position.set(2.5, 0.76, 4.5);
   button.castShadow = true;
   group.add(button);
   disposables.push(buttonGeometry, buttonMaterial);

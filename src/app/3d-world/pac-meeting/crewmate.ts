@@ -3,6 +3,7 @@ import * as THREE from "three";
 // The man: a single red capsule. Faces +Z when rotation.y === 0.
 export function buildCrewmate(): {
   group: THREE.Group;
+  setColor: (color: number) => void;
   dispose: () => void;
 } {
   const group = new THREE.Group();
@@ -19,6 +20,7 @@ export function buildCrewmate(): {
 
   return {
     group,
+    setColor: (color: number) => bodyMaterial.color.set(color),
     dispose: () => {
       bodyGeometry.dispose();
       bodyMaterial.dispose();
