@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Collider } from "./house";
 import { drawApplePoster, drawCmynaSign, drawDrakeQuote } from "./cmyna-art";
+import { buildConstructionSign } from "./construction-sign";
 
 // Cmyna Crib: a very large house (16x14) south of Tycoon House, east of the
 // road. Door on the west wall, gap z 40..41.5.
@@ -91,6 +92,12 @@ export function buildCmyna(): {
   box(wallMaterial, 8, WALL_HEIGHT / 2, 44.75, WALL_THICKNESS, WALL_HEIGHT, 6.5, true);
 
   canvasPlane(drawCmynaSign, 256, 64, 2.4, 0.6, 7.82, 2.05, 40.75, -Math.PI / 2);
+
+  // Still under construction, apparently.
+  const constructionSign = buildConstructionSign(5.4, 39.2, -Math.PI / 2);
+  group.add(constructionSign.group);
+  colliders.push(constructionSign.collider);
+  disposables.push({ dispose: constructionSign.dispose });
 
   // Wall art: the apple poster and three Drake quotes.
   canvasPlane(drawApplePoster, 192, 128, 1.3, 0.85, 14, 1.5, 34.17, 0);

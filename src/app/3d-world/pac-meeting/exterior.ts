@@ -38,13 +38,13 @@ export function buildExterior(): {
   };
 
   // Lawn under and around everything, and the straight road from the door.
-  const lawnGeometry = new THREE.PlaneGeometry(60, 68).rotateX(-Math.PI / 2);
+  const lawnGeometry = new THREE.PlaneGeometry(82, 68).rotateX(-Math.PI / 2);
   const lawnMaterial = new THREE.MeshStandardMaterial({
     color: 0x2d4a23,
     roughness: 1,
   });
   const lawn = new THREE.Mesh(lawnGeometry, lawnMaterial);
-  lawn.position.set(3, -0.012, 19);
+  lawn.position.set(14, -0.012, 19);
   lawn.receiveShadow = true;
   group.add(lawn);
   disposables.push(lawnGeometry, lawnMaterial);
@@ -157,10 +157,10 @@ export function buildExterior(): {
 
   // Invisible bounds so the crewmate stays on the lawn.
   colliders.push(
-    { minX: -28, maxX: 34, minZ: 51, maxZ: 52 }, // south
-    { minX: -28, maxX: 34, minZ: -14, maxZ: -13 }, // north
+    { minX: -28, maxX: 54, minZ: 51, maxZ: 52 }, // south
+    { minX: -28, maxX: 54, minZ: -14, maxZ: -13 }, // north
     { minX: -17, maxX: -16, minZ: -14, maxZ: 52 }, // west
-    { minX: 25, maxX: 26, minZ: -14, maxZ: 52 }, // east
+    { minX: 48, maxX: 49, minZ: -14, maxZ: 52 }, // east
   );
 
   return {

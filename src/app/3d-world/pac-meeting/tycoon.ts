@@ -19,6 +19,74 @@ const PARKING: [VehicleKind, number, number, number][] = [
   ["suv", 10.3, 30.1, 0x8c8c94],
 ];
 
+function drawZipMovers(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = "#f2f2ec";
+  ctx.fillRect(0, 0, 256, 96);
+  ctx.strokeStyle = "#1d3f8c";
+  ctx.lineWidth = 5;
+  ctx.strokeRect(4, 4, 248, 88);
+  // Lightning bolt.
+  ctx.fillStyle = "#e8a020";
+  ctx.beginPath();
+  ctx.moveTo(38, 14);
+  ctx.lineTo(22, 52);
+  ctx.lineTo(34, 52);
+  ctx.lineTo(26, 84);
+  ctx.lineTo(50, 42);
+  ctx.lineTo(37, 42);
+  ctx.lineTo(48, 14);
+  ctx.fill();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#1d3f8c";
+  ctx.font = "bold 30px sans-serif";
+  ctx.fillText("ZIP MOVERS", 150, 48);
+  ctx.font = "12px sans-serif";
+  ctx.fillText("FAST · CAREFUL · GONE", 150, 72);
+}
+
+function drawTempleWaterBill(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = "#fbf8ef";
+  ctx.fillRect(0, 0, 128, 176);
+  ctx.strokeStyle = "#c9c2ae";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(4, 4, 120, 168);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#2a2620";
+  ctx.font = "bold 13px serif";
+  ctx.fillText("Temple Water Bill", 64, 34);
+  ctx.strokeStyle = "#8a8270";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(16, 44);
+  ctx.lineTo(112, 44);
+  ctx.stroke();
+  ctx.font = "bold 24px serif";
+  ctx.fillText("LKR50k", 64, 100);
+  // Faint ruled lines below, like the rest of the letter.
+  ctx.strokeStyle = "#d8d2c0";
+  for (const y of [126, 140, 154]) {
+    ctx.beginPath();
+    ctx.moveTo(20, y);
+    ctx.lineTo(108, y);
+    ctx.stroke();
+  }
+}
+
+function drawWallWriting(ctx: CanvasRenderingContext2D) {
+  // Transparent background so it reads as writing directly on the wall.
+  ctx.clearRect(0, 0, 512, 96);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#7a2222";
+  ctx.font = "italic bold 38px cursive";
+  ctx.fillText("Do only tax-deductible stuff.", 256, 58);
+  ctx.strokeStyle = "#7a2222";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(96, 74);
+  ctx.quadraticCurveTo(256, 84, 416, 72);
+  ctx.stroke();
+}
+
 function drawTycoonSign(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#120e08";
   ctx.fillRect(0, 0, 256, 64);
@@ -101,7 +169,9 @@ export function buildTycoon(): {
 
   box(wallMaterial, group, 17.5, WALL_HEIGHT / 2, 21, 9, WALL_HEIGHT, WALL_THICKNESS, true);
   box(wallMaterial, group, 17.5, WALL_HEIGHT / 2, 31, 9, WALL_HEIGHT, WALL_THICKNESS, true);
-  box(wallMaterial, group, 22, WALL_HEIGHT / 2, 26, WALL_THICKNESS, WALL_HEIGHT, 10, true);
+  // East wall, split by the back entrance to the lake (gap z 25.25..26.75).
+  box(wallMaterial, group, 22, WALL_HEIGHT / 2, 23.125, WALL_THICKNESS, WALL_HEIGHT, 4.25, true);
+  box(wallMaterial, group, 22, WALL_HEIGHT / 2, 28.875, WALL_THICKNESS, WALL_HEIGHT, 4.25, true);
   box(wallMaterial, group, 13, WALL_HEIGHT / 2, 23.125, WALL_THICKNESS, WALL_HEIGHT, 4.25, true);
   box(wallMaterial, group, 13, WALL_HEIGHT / 2, 28.875, WALL_THICKNESS, WALL_HEIGHT, 4.25, true);
 
@@ -118,6 +188,23 @@ export function buildTycoon(): {
   sign.rotation.y = -Math.PI / 2;
   group.add(sign);
   disposables.push(signTexture, signMaterial, signGeometry);
+
+  // Writing on the north wall, above the money piles.
+  const writingCanvas = document.createElement("canvas");
+  writingCanvas.width = 512;
+  writingCanvas.height = 96;
+  drawWallWriting(writingCanvas.getContext("2d")!);
+  const writingTexture = new THREE.CanvasTexture(writingCanvas);
+  const writingMaterial = new THREE.MeshBasicMaterial({
+    map: writingTexture,
+    transparent: true,
+  });
+  const writingGeometry = new THREE.PlaneGeometry(4.6, 0.86);
+  disposables.push(writingTexture, writingMaterial, writingGeometry);
+  const writing = new THREE.Mesh(writingGeometry, writingMaterial);
+  writing.position.set(17.5, 1.62, 21.17);
+  writing.rotation.z = 0.03; // a slightly crooked hand
+  group.add(writing);
 
   // --- Money ---
   const bundle = (x: number, y: number, z: number, rotation: number) => {
@@ -168,8 +255,22 @@ export function buildTycoon(): {
     group.add(bill);
   }
 
-  // Table with bills scattered on top.
+  // Table with bills scattered on top, plus the temple water bill letter.
   box(woodMaterial, group, 19.8, 0.38, 24.8, 1.7, 0.76, 0.9, true);
+  const letterCanvas = document.createElement("canvas");
+  letterCanvas.width = 128;
+  letterCanvas.height = 176;
+  drawTempleWaterBill(letterCanvas.getContext("2d")!);
+  const letterTexture = new THREE.CanvasTexture(letterCanvas);
+  const letterMaterial = new THREE.MeshStandardMaterial({ map: letterTexture });
+  const letterGeometry = new THREE.PlaneGeometry(0.5, 0.69).rotateX(
+    -Math.PI / 2,
+  );
+  disposables.push(letterTexture, letterMaterial, letterGeometry);
+  const letter = new THREE.Mesh(letterGeometry, letterMaterial);
+  letter.position.set(19.55, 0.785, 24.75);
+  letter.rotation.y = 0.25;
+  group.add(letter);
   for (let i = 0; i < 12; i++) {
     const bill = new THREE.Mesh(billGeometry, billMaterial);
     bill.position.set(
@@ -203,6 +304,16 @@ export function buildTycoon(): {
   );
   disposables.push(tireGeometry);
 
+  // Shared "Zip Movers" livery for the lorry cargo boxes.
+  const zipCanvas = document.createElement("canvas");
+  zipCanvas.width = 256;
+  zipCanvas.height = 96;
+  drawZipMovers(zipCanvas.getContext("2d")!);
+  const zipTexture = new THREE.CanvasTexture(zipCanvas);
+  const zipMaterial = new THREE.MeshStandardMaterial({ map: zipTexture });
+  const zipGeometry = new THREE.PlaneGeometry(2.1, 0.85);
+  disposables.push(zipTexture, zipMaterial, zipGeometry);
+
   const buildVehicle = (kind: VehicleKind, paint: number) => {
     const vehicle = new THREE.Group();
     const paintMaterial = new THREE.MeshStandardMaterial({
@@ -224,6 +335,12 @@ export function buildTycoon(): {
       box(paintMaterial, vehicle, 0, 0.62, -1.25, 1.5, 0.85, 1.0); // cab
       box(glassMaterial, vehicle, 0, 0.95, -1.72, 1.3, 0.35, 0.06);
       box(wallMaterial, vehicle, 0, 0.85, 0.55, 1.6, 1.3, 2.4); // cargo
+      for (const side of [1, -1]) {
+        const livery = new THREE.Mesh(zipGeometry, zipMaterial);
+        livery.position.set(side * 0.81, 0.9, 0.55);
+        livery.rotation.y = (side * Math.PI) / 2;
+        vehicle.add(livery);
+      }
       wheels.push(
         [-0.78, -1.3], [0.78, -1.3],
         [-0.78, 0.0], [0.78, 0.0],

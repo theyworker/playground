@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import type { Collider } from "./house";
-import { drawKoreaFlag, drawSign, drawSriLankaFlag } from "./restaurant-art";
+import {
+  drawBossCaption,
+  drawBossPortrait,
+  drawKoreaFlag,
+  drawSign,
+  drawSriLankaFlag,
+} from "./restaurant-art";
 
 // Dehan's Korean BBQ: a 12x10 building west of the road end (x -13..-1,
 // z 21..31). Entrance on the east wall, gap z 25..26.5, facing the road.
@@ -176,6 +182,39 @@ export function buildRestaurant(): {
   };
   hangFlag(drawSriLankaFlag, -8.2);
   hangFlag(drawKoreaFlag, -5.8);
+
+  // --- The boss portrait, NE corner of the east wall, kept pixelated ---
+  const portraitCanvas = document.createElement("canvas");
+  portraitCanvas.width = 16;
+  portraitCanvas.height = 20;
+  drawBossPortrait(portraitCanvas.getContext("2d")!);
+  const portraitTexture = new THREE.CanvasTexture(portraitCanvas);
+  portraitTexture.magFilter = THREE.NearestFilter;
+  portraitTexture.minFilter = THREE.NearestFilter;
+  portraitTexture.generateMipmaps = false;
+  const portraitMaterial = new THREE.MeshStandardMaterial({
+    map: portraitTexture,
+  });
+  const portraitGeometry = new THREE.PlaneGeometry(0.72, 0.9);
+  disposables.push(portraitTexture, portraitMaterial, portraitGeometry);
+  box(darkWoodMaterial, -1.18, 1.62, 22.3, 0.06, 1.0, 0.82); // frame
+  const portrait = new THREE.Mesh(portraitGeometry, portraitMaterial);
+  portrait.position.set(-1.21, 1.62, 22.3);
+  portrait.rotation.y = -Math.PI / 2;
+  group.add(portrait);
+
+  const captionCanvas = document.createElement("canvas");
+  captionCanvas.width = 256;
+  captionCanvas.height = 48;
+  drawBossCaption(captionCanvas.getContext("2d")!);
+  const captionTexture = new THREE.CanvasTexture(captionCanvas);
+  const captionMaterial = new THREE.MeshStandardMaterial({ map: captionTexture });
+  const captionGeometry = new THREE.PlaneGeometry(0.78, 0.15);
+  disposables.push(captionTexture, captionMaterial, captionGeometry);
+  const caption = new THREE.Mesh(captionGeometry, captionMaterial);
+  caption.position.set(-1.18, 1.0, 22.3);
+  caption.rotation.y = -Math.PI / 2;
+  group.add(caption);
 
   // --- Nine wall-mounted air conditioners ---
   const acPositions: [number, number, number][] = [

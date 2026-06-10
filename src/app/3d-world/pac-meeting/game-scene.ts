@@ -9,6 +9,7 @@ import { buildRestaurant } from "./restaurant";
 import { buildTycoon } from "./tycoon";
 import { buildDevind } from "./devind";
 import { buildCmyna } from "./cmyna";
+import { buildLake } from "./lake";
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_SPEED = 3.2;
@@ -99,6 +100,10 @@ export function createGameScene(container: HTMLElement): () => void {
   const cmyna = buildCmyna();
   scene.add(cmyna.group);
   house.colliders.push(...cmyna.colliders);
+
+  const lake = buildLake();
+  scene.add(lake.group);
+  house.colliders.push(...lake.colliders);
 
   // M-key range circle, drawn flat on the floor around the character.
   const circleGeometry = new THREE.RingGeometry(
@@ -276,6 +281,7 @@ export function createGameScene(container: HTMLElement): () => void {
     tycoon.dispose();
     devind.dispose();
     cmyna.dispose();
+    lake.dispose();
     circleGeometry.dispose();
     circleMaterial.dispose();
     renderer.dispose();

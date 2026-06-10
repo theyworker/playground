@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Collider } from "./house";
 import { drawDevindSign, drawTechPoster, drawTiktokSign } from "./devind-art";
+import { buildConstructionSign } from "./construction-sign";
 
 // Devind's Place: x -13..-1, z 34..46, just south of the BBQ. Door on the
 // east wall (gap z 39..40.5) facing the extended road.
@@ -94,6 +95,12 @@ export function buildDevind(): {
   box(wallMaterial, -1, WALL_HEIGHT / 2, 43.25, WALL_THICKNESS, WALL_HEIGHT, 5.5, true);
 
   canvasPlane(drawDevindSign, 256, 64, 2.4, 0.6, -0.82, 2.05, 39.75, Math.PI / 2);
+
+  // Still under construction, apparently.
+  const constructionSign = buildConstructionSign(0.7, 38.3, Math.PI / 2);
+  group.add(constructionSign.group);
+  colliders.push(constructionSign.collider);
+  disposables.push({ dispose: constructionSign.dispose });
   canvasPlane(drawTechPoster, 192, 128, 1.2, 0.8, -6, 1.5, 34.17, 0);
 
   // --- Indoor cricket net along the west wall (open at the north end) ---

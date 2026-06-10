@@ -1,4 +1,63 @@
-// Canvas art for Dehan's Korean BBQ: the signboard and the two flags.
+// Canvas art for Dehan's Korean BBQ: the signboard, the two flags, and the
+// pixelated boss portrait.
+
+// 16x20 pixel map: h hair, f face, e eye, m mouth, n neck, s suit,
+// w shirt, t tie, . background.
+const BOSS_PIXELS = [
+  "................",
+  "................",
+  "....hhhhhhhh....",
+  "...hhhhhhhhhh...",
+  "...hhhhhhhhhh...",
+  "...hffffffffh...",
+  "...ffffffffff...",
+  "...ffeffffeff...",
+  "...ffffffffff...",
+  "...ffffmmffff...",
+  "...ffffffffff...",
+  "....fnnnnnnf....",
+  "..sssswwwwssss..",
+  ".ssssswttwsssss.",
+  "sssssswttwssssss",
+  "sssssswttwssssss",
+  "sssssswttwssssss",
+  "sssssswwwwssssss",
+  "ssssssssssssssss",
+  "ssssssssssssssss",
+];
+
+const BOSS_COLORS: Record<string, string> = {
+  ".": "#c8d4da",
+  h: "#3a2a1a",
+  f: "#e0b186",
+  e: "#26201a",
+  m: "#a8704e",
+  n: "#d4a47a",
+  s: "#28344e",
+  w: "#f0f0ea",
+  t: "#a8242c",
+};
+
+export function drawBossPortrait(ctx: CanvasRenderingContext2D) {
+  for (let y = 0; y < BOSS_PIXELS.length; y++) {
+    for (let x = 0; x < BOSS_PIXELS[y].length; x++) {
+      ctx.fillStyle = BOSS_COLORS[BOSS_PIXELS[y][x]];
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+export function drawBossCaption(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = "#1c0f08";
+  ctx.fillRect(0, 0, 256, 48);
+  ctx.strokeStyle = "#e8a33d";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(3, 3, 250, 42);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#f5c542";
+  ctx.font = "bold 19px serif";
+  ctx.fillText("Best Boss in the world", 128, 31);
+}
 
 export function drawSign(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#1c0f08";
