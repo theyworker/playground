@@ -15,6 +15,7 @@ import { buildMansion } from "./mansion";
 import { bakeStatic } from "./bake-static";
 import { createMusic } from "./music";
 import { buildWadx } from "./wadx";
+import { createMultiplayer } from "./multiplayer";
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_SPEED = 3.2;
@@ -59,10 +60,13 @@ export function createGameScene(container: HTMLElement): () => void {
   // for a barely visible sharpness difference.
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   // The world is static; we re-render the shadow map manually at half
-  // frame rate instead of every frame.
+  // frame rate instead of every frame. needsUpdate must be set before
+  // the first render — sampling a never-rendered shadow map makes the
+  // GPU reject every draw call (blank scene).
   renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
   container.appendChild(renderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xbfc8ff, 0.55));
@@ -147,6 +151,8 @@ export function createGameScene(container: HTMLElement): () => void {
   ].map((build) => bakeStatic(build.group));
 
   const music = createMusic(camera, scene);
+  const multiplayer = createMultiplayer(scene);
+  let localColor = 0xc51111;
 
   // M-key range circle, drawn flat on the floor around the character.
   const circleGeometry = new THREE.RingGeometry(
@@ -239,9 +245,10 @@ export function createGameScene(container: HTMLElement): () => void {
     const delta = Math.min(clock.getDelta(), 0.05);
     frameTick++;
 
-    // Re-aim the shadow box at the player and redraw the map at 30Hz.
-    // Snapping to shadow texels stops the edges from shimmering.
-    if (frameTick % 2 === 0) {
+    // Re-aim the shadow box at the player and redraw the map at 30Hz
+    // (including the very first frame). Snapping to shadow texels stops
+    // the edges from shimmering.
+    if (frameTick % 2 === 1) {
       const snapX = Math.round(crewmate.group.position.x / shadowTexel) * shadowTexel;
       const snapZ = Math.round(crewmate.group.position.z / shadowTexel) * shadowTexel;
       sun.position.set(snapX + 6, 12, snapZ + 4);
@@ -292,6 +299,7 @@ export function createGameScene(container: HTMLElement): () => void {
       const dz = shirt.group.position.z - crewmate.group.position.z;
       if (dx * dx + dz * dz < 0.45 * 0.45) {
         crewmate.setColor(shirt.color);
+        localColor = shirt.color;
       }
     }
 
@@ -299,6 +307,12 @@ export function createGameScene(container: HTMLElement): () => void {
     tvRoom.update(delta, crewmate.group.position);
     lake.update(delta);
     music.update(delta, crewmate.group.position);
+    multiplayer.update(delta, {
+      x: crewmate.group.position.x,
+      z: crewmate.group.position.z,
+      ry: crewmate.group.rotation.y,
+      color: localColor,
+    });
 
     cameraTarget.copy(crewmate.group.position).add(cameraOffset());
     camera.position.lerp(cameraTarget, Math.min(1, delta * (dragging ? 20 : 4)));
@@ -345,6 +359,7 @@ export function createGameScene(container: HTMLElement): () => void {
     wadx.dispose();
     baked.forEach((bake) => bake.dispose());
     music.dispose();
+    multiplayer.dispose();
     circleGeometry.dispose();
     circleMaterial.dispose();
     renderer.dispose();
