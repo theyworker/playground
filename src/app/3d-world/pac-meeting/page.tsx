@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import AvControls from "./av-controls";
 import MobileControls from "./mobile-controls";
-import MultiplayerPanel from "./multiplayer-panel";
 
 export default function PacMeetingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,8 +39,6 @@ export default function PacMeetingPage() {
       <AvControls />
 
       <MobileControls />
-
-      <MultiplayerPanel />
     </main>
   );
 }

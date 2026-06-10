@@ -15,7 +15,6 @@ import { buildMansion } from "./mansion";
 import { bakeStatic } from "./bake-static";
 import { createMusic } from "./music";
 import { buildWadx } from "./wadx";
-import { createMultiplayer } from "./multiplayer";
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_SPEED = 3.2;
@@ -56,35 +55,21 @@ export function createGameScene(container: HTMLElement): () => void {
     powerPreference: "high-performance",
   });
   renderer.setSize(container.clientWidth, container.clientHeight);
-  // 1.5 instead of 2: on hi-DPI screens this is ~44% fewer fragments
-  // for a barely visible sharpness difference.
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
-  // The world is static; we re-render the shadow map manually at half
-  // frame rate instead of every frame. needsUpdate must be set before
-  // the first render — sampling a never-rendered shadow map makes the
-  // GPU reject every draw call (blank scene).
-  renderer.shadowMap.autoUpdate = false;
-  renderer.shadowMap.needsUpdate = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xbfc8ff, 0.55));
-  // A tight shadow frustum that follows the player: a 1024 map over a
-  // 40-unit box gives better texel density than the old 2048 map over
-  // the whole 116-unit world, at a quarter of the fill cost.
-  const SHADOW_EXTENT = 20;
   const sun = new THREE.DirectionalLight(0xfff4e0, 1.4);
   sun.position.set(6, 12, 4);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.camera.left = -SHADOW_EXTENT;
-  sun.shadow.camera.right = SHADOW_EXTENT;
-  sun.shadow.camera.top = SHADOW_EXTENT;
-  sun.shadow.camera.bottom = -SHADOW_EXTENT;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -58;
+  sun.shadow.camera.right = 58;
+  sun.shadow.camera.top = 58;
+  sun.shadow.camera.bottom = -58;
   scene.add(sun);
-  scene.add(sun.target);
-  const shadowTexel = (SHADOW_EXTENT * 2) / 1024;
 
   const house = buildHouse();
   scene.add(house.group);
@@ -151,8 +136,6 @@ export function createGameScene(container: HTMLElement): () => void {
   ].map((build) => bakeStatic(build.group));
 
   const music = createMusic(camera, scene);
-  const multiplayer = createMultiplayer(scene);
-  let localColor = 0xc51111;
 
   // M-key range circle, drawn flat on the floor around the character.
   const circleGeometry = new THREE.RingGeometry(
@@ -239,23 +222,9 @@ export function createGameScene(container: HTMLElement): () => void {
 
   const clock = new THREE.Clock();
   let frame = 0;
-  let frameTick = 0;
   const animate = () => {
     frame = requestAnimationFrame(animate);
     const delta = Math.min(clock.getDelta(), 0.05);
-    frameTick++;
-
-    // Re-aim the shadow box at the player and redraw the map at 30Hz
-    // (including the very first frame). Snapping to shadow texels stops
-    // the edges from shimmering.
-    if (frameTick % 2 === 1) {
-      const snapX = Math.round(crewmate.group.position.x / shadowTexel) * shadowTexel;
-      const snapZ = Math.round(crewmate.group.position.z / shadowTexel) * shadowTexel;
-      sun.position.set(snapX + 6, 12, snapZ + 4);
-      sun.target.position.set(snapX, 0, snapZ);
-      sun.target.updateMatrixWorld();
-      renderer.shadowMap.needsUpdate = true;
-    }
 
     moveDirection.set(
       Number(keys.has("KeyD") || keys.has("ArrowRight")) -
@@ -299,7 +268,6 @@ export function createGameScene(container: HTMLElement): () => void {
       const dz = shirt.group.position.z - crewmate.group.position.z;
       if (dx * dx + dz * dz < 0.45 * 0.45) {
         crewmate.setColor(shirt.color);
-        localColor = shirt.color;
       }
     }
 
@@ -307,12 +275,6 @@ export function createGameScene(container: HTMLElement): () => void {
     tvRoom.update(delta, crewmate.group.position);
     lake.update(delta);
     music.update(delta, crewmate.group.position);
-    multiplayer.update(delta, {
-      x: crewmate.group.position.x,
-      z: crewmate.group.position.z,
-      ry: crewmate.group.rotation.y,
-      color: localColor,
-    });
 
     cameraTarget.copy(crewmate.group.position).add(cameraOffset());
     camera.position.lerp(cameraTarget, Math.min(1, delta * (dragging ? 20 : 4)));
@@ -359,7 +321,6 @@ export function createGameScene(container: HTMLElement): () => void {
     wadx.dispose();
     baked.forEach((bake) => bake.dispose());
     music.dispose();
-    multiplayer.dispose();
     circleGeometry.dispose();
     circleMaterial.dispose();
     renderer.dispose();
