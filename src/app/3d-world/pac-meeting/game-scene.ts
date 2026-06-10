@@ -55,21 +55,32 @@ export function createGameScene(container: HTMLElement): () => void {
     powerPreference: "high-performance",
   });
   renderer.setSize(container.clientWidth, container.clientHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // 1.5 instead of 2: on hi-DPI screens this is ~44% fewer fragments
+  // for a barely visible sharpness difference.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // The world is static; we re-render the shadow map manually at half
+  // frame rate instead of every frame.
+  renderer.shadowMap.autoUpdate = false;
   container.appendChild(renderer.domElement);
 
   scene.add(new THREE.AmbientLight(0xbfc8ff, 0.55));
+  // A tight shadow frustum that follows the player: a 1024 map over a
+  // 40-unit box gives better texel density than the old 2048 map over
+  // the whole 116-unit world, at a quarter of the fill cost.
+  const SHADOW_EXTENT = 20;
   const sun = new THREE.DirectionalLight(0xfff4e0, 1.4);
   sun.position.set(6, 12, 4);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -58;
-  sun.shadow.camera.right = 58;
-  sun.shadow.camera.top = 58;
-  sun.shadow.camera.bottom = -58;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -SHADOW_EXTENT;
+  sun.shadow.camera.right = SHADOW_EXTENT;
+  sun.shadow.camera.top = SHADOW_EXTENT;
+  sun.shadow.camera.bottom = -SHADOW_EXTENT;
   scene.add(sun);
+  scene.add(sun.target);
+  const shadowTexel = (SHADOW_EXTENT * 2) / 1024;
 
   const house = buildHouse();
   scene.add(house.group);
@@ -222,9 +233,22 @@ export function createGameScene(container: HTMLElement): () => void {
 
   const clock = new THREE.Clock();
   let frame = 0;
+  let frameTick = 0;
   const animate = () => {
     frame = requestAnimationFrame(animate);
     const delta = Math.min(clock.getDelta(), 0.05);
+    frameTick++;
+
+    // Re-aim the shadow box at the player and redraw the map at 30Hz.
+    // Snapping to shadow texels stops the edges from shimmering.
+    if (frameTick % 2 === 0) {
+      const snapX = Math.round(crewmate.group.position.x / shadowTexel) * shadowTexel;
+      const snapZ = Math.round(crewmate.group.position.z / shadowTexel) * shadowTexel;
+      sun.position.set(snapX + 6, 12, snapZ + 4);
+      sun.target.position.set(snapX, 0, snapZ);
+      sun.target.updateMatrixWorld();
+      renderer.shadowMap.needsUpdate = true;
+    }
 
     moveDirection.set(
       Number(keys.has("KeyD") || keys.has("ArrowRight")) -

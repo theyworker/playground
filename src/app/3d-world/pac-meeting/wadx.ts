@@ -202,9 +202,8 @@ export function buildWadx(): RoomBuild {
   kit.box(darkDesk, -20, 1.5, 62.86, 3.4, 1.5, 0.04); // whiteboard frame
   kit.box(darkDesk, -16.3, 0.42, 62.2, 1.3, 0.84, 0.7, true); // invigilator desk
   kit.mesh(clockGeometry, paper, -20, 2.05, 56.2);
-  const examLight = new THREE.PointLight(0xfff6e8, 10, 14, 1.8);
-  examLight.position.set(-20, 2.3, 59.5);
-  kit.group.add(examLight);
+  // (One point light at reception covers the center — every extra
+  // point light adds per-fragment cost to the whole scene.)
 
   // --- Speaking studio (x -32..-25, z 56..63): 4 booths, ~34 items ---
   for (let i = 0; i < 4; i++) {

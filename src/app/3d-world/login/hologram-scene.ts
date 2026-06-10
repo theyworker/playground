@@ -42,7 +42,7 @@ export function createHologramScene(container: HTMLElement): () => void {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(container.clientWidth, container.clientHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   container.appendChild(renderer.domElement);
 
   const composer = new EffectComposer(renderer);
