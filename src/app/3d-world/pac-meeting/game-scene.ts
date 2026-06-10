@@ -67,7 +67,8 @@ export function createGameScene(container: HTMLElement): () => void {
   scene.add(house.group);
 
   const crewmate = buildCrewmate();
-  crewmate.group.position.set(-4, 0, 0);
+  // Spawn in the middle of the road, between the houses.
+  crewmate.group.position.set(2.5, 0, 26);
   scene.add(crewmate.group);
 
   const wardrobe = buildTshirts();
