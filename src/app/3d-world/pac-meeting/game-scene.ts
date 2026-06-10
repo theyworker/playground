@@ -6,6 +6,7 @@ import { buildWashroom } from "./washroom";
 import { buildTvRoom } from "./tv-room";
 import { buildExterior } from "./exterior";
 import { buildRestaurant } from "./restaurant";
+import { buildTycoon } from "./tycoon";
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_SPEED = 3.2;
@@ -53,10 +54,10 @@ export function createGameScene(container: HTMLElement): () => void {
   sun.position.set(6, 12, 4);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -24;
-  sun.shadow.camera.right = 24;
-  sun.shadow.camera.top = 24;
-  sun.shadow.camera.bottom = -24;
+  sun.shadow.camera.left = -30;
+  sun.shadow.camera.right = 30;
+  sun.shadow.camera.top = 30;
+  sun.shadow.camera.bottom = -30;
   scene.add(sun);
 
   const house = buildHouse();
@@ -84,6 +85,10 @@ export function createGameScene(container: HTMLElement): () => void {
   const restaurant = buildRestaurant();
   scene.add(restaurant.group);
   house.colliders.push(...restaurant.colliders);
+
+  const tycoon = buildTycoon();
+  scene.add(tycoon.group);
+  house.colliders.push(...tycoon.colliders);
 
   // M-key range circle, drawn flat on the floor around the character.
   const circleGeometry = new THREE.RingGeometry(
@@ -258,6 +263,7 @@ export function createGameScene(container: HTMLElement): () => void {
     tvRoom.dispose();
     exterior.dispose();
     restaurant.dispose();
+    tycoon.dispose();
     circleGeometry.dispose();
     circleMaterial.dispose();
     renderer.dispose();
