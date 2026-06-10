@@ -7,6 +7,8 @@ import { buildTvRoom } from "./tv-room";
 import { buildExterior } from "./exterior";
 import { buildRestaurant } from "./restaurant";
 import { buildTycoon } from "./tycoon";
+import { buildDevind } from "./devind";
+import { buildCmyna } from "./cmyna";
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_SPEED = 3.2;
@@ -54,10 +56,10 @@ export function createGameScene(container: HTMLElement): () => void {
   sun.position.set(6, 12, 4);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -30;
-  sun.shadow.camera.right = 30;
-  sun.shadow.camera.top = 30;
-  sun.shadow.camera.bottom = -30;
+  sun.shadow.camera.left = -42;
+  sun.shadow.camera.right = 42;
+  sun.shadow.camera.top = 42;
+  sun.shadow.camera.bottom = -42;
   scene.add(sun);
 
   const house = buildHouse();
@@ -89,6 +91,14 @@ export function createGameScene(container: HTMLElement): () => void {
   const tycoon = buildTycoon();
   scene.add(tycoon.group);
   house.colliders.push(...tycoon.colliders);
+
+  const devind = buildDevind();
+  scene.add(devind.group);
+  house.colliders.push(...devind.colliders);
+
+  const cmyna = buildCmyna();
+  scene.add(cmyna.group);
+  house.colliders.push(...cmyna.colliders);
 
   // M-key range circle, drawn flat on the floor around the character.
   const circleGeometry = new THREE.RingGeometry(
@@ -264,6 +274,8 @@ export function createGameScene(container: HTMLElement): () => void {
     exterior.dispose();
     restaurant.dispose();
     tycoon.dispose();
+    devind.dispose();
+    cmyna.dispose();
     circleGeometry.dispose();
     circleMaterial.dispose();
     renderer.dispose();
