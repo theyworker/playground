@@ -274,6 +274,7 @@ export function createGameScene(container: HTMLElement): () => void {
     washroom.update(delta, crewmate.group.position);
     tvRoom.update(delta, crewmate.group.position);
     lake.update(delta);
+    music.update(delta, crewmate.group.position);
 
     cameraTarget.copy(crewmate.group.position).add(cameraOffset());
     camera.position.lerp(cameraTarget, Math.min(1, delta * (dragging ? 20 : 4)));
