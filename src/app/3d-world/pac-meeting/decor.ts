@@ -134,7 +134,7 @@ export function buildDecor(): {
   };
   addWindow(-6, -9.8, 0); // north wall, living area
   addWindow(9, -9.8, 0); // north wall, bedroom
-  addWindow(-13.8, 2, Math.PI / 2); // west wall, lounge
+  addWindow(-13.8, -3, Math.PI / 2); // west wall (now into the library)
   addWindow(-5, 9.8, Math.PI); // south wall
 
   // --- Bookshelves with colored books (solid) ---
@@ -180,7 +180,7 @@ export function buildDecor(): {
       maxZ: z + halfD,
     });
   };
-  addBookshelf(-12, -9.5, 0); // against north wall, kitchen side
+  addBookshelf(-3, 9.4, Math.PI); // against south wall, behind the couch
   addBookshelf(13.6, 1, -Math.PI / 2); // against east wall, lounge
 
   // --- Pettagama: traditional Sri Lankan teak storage chest (solid) ---

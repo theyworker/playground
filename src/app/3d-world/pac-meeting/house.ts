@@ -59,11 +59,16 @@ export function buildHouse(): {
     addBox(wallMaterial, x, z, width, depth, WALL_HEIGHT);
 
   // Outer shell (28 x 20, centered at origin).
-  addWall(0, -10, 28, WALL_THICKNESS); // north
+  // North wall, split by the bedroom-to-pool-hall door (gap x 7..8.5).
+  addWall(-3.5, -10, 21, WALL_THICKNESS);
+  addWall(11.25, -10, 5.5, WALL_THICKNESS);
   // South wall, split by the main entrance (gap x 1.5..3.5).
   addWall(-6.25, 10, 15.5, WALL_THICKNESS);
   addWall(8.75, 10, 10.5, WALL_THICKNESS);
-  addWall(-14, 0, WALL_THICKNESS, 20); // west
+  // West wall, split by the library door (z -6..-4.5) and gym door (z 1..2.5).
+  addWall(-14, -8, WALL_THICKNESS, 4);
+  addWall(-14, -1.75, WALL_THICKNESS, 5.5);
+  addWall(-14, 6.25, WALL_THICKNESS, 7.5);
   addWall(14, 0, WALL_THICKNESS, 20); // east
 
   // Bedroom, NE corner. Vertical wall at x=5 with a door gap z=-5.4..-4.2,

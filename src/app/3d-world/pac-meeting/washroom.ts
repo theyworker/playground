@@ -162,6 +162,7 @@ export function buildWashroom(): {
   disposables.push(seatGeometry);
   // Lid hinged at the tank side; rotating +z lifts its free end up.
   const lidPivot = new THREE.Group();
+  lidPivot.userData.dynamic = true; // animates — excluded from static baking
   lidPivot.position.set(-13.48, 0.5, 4.9);
   const lid = box(porcelainMaterial, 0, 0, 0, 0.5, 0.04, 0.58);
   lid.position.set(0.26, 0, 0);

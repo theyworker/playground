@@ -194,6 +194,7 @@ export function buildTvRoom(): {
   group.add(screenLight);
 
   let playTime = 0;
+  let sinceRedraw = 0;
   let wasActive = false;
   const update = (delta: number, player: THREE.Vector3) => {
     const active =
@@ -201,8 +202,14 @@ export function buildTvRoom(): {
       TV_ACTIVE_DISTANCE;
     if (active) {
       playTime += delta;
-      drawTvFrame(tvContext, playTime);
-      tvTexture.needsUpdate = true;
+      sinceRedraw += delta;
+      // Redraw + re-upload the canvas at ~12fps, not every frame —
+      // texture uploads are the expensive part.
+      if (sinceRedraw > 1 / 12) {
+        sinceRedraw = 0;
+        drawTvFrame(tvContext, playTime);
+        tvTexture.needsUpdate = true;
+      }
       screenLight.intensity = 6 + Math.sin(playTime * 7) * 1.5;
     } else if (wasActive) {
       drawTvStandby(tvContext);

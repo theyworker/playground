@@ -38,24 +38,24 @@ export function buildExterior(): {
   };
 
   // Lawn under and around everything, and the straight road from the door.
-  const lawnGeometry = new THREE.PlaneGeometry(82, 68).rotateX(-Math.PI / 2);
+  const lawnGeometry = new THREE.PlaneGeometry(106, 100).rotateX(-Math.PI / 2);
   const lawnMaterial = new THREE.MeshStandardMaterial({
     color: 0x2d4a23,
     roughness: 1,
   });
   const lawn = new THREE.Mesh(lawnGeometry, lawnMaterial);
-  lawn.position.set(14, -0.012, 19);
+  lawn.position.set(2, -0.012, 16);
   lawn.receiveShadow = true;
   group.add(lawn);
   disposables.push(lawnGeometry, lawnMaterial);
 
-  const roadGeometry = new THREE.PlaneGeometry(3.5, 38).rotateX(-Math.PI / 2);
+  const roadGeometry = new THREE.PlaneGeometry(3.5, 39.7).rotateX(-Math.PI / 2);
   const roadMaterial = new THREE.MeshStandardMaterial({
     color: 0x2b2b30,
     roughness: 0.9,
   });
   const road = new THREE.Mesh(roadGeometry, roadMaterial);
-  road.position.set(2.5, 0.004, 29.3);
+  road.position.set(2.5, 0.004, 30.15);
   road.receiveShadow = true;
   group.add(road);
   disposables.push(roadGeometry, roadMaterial);
@@ -63,7 +63,7 @@ export function buildExterior(): {
   // Dashed center line.
   const dashMaterial = new THREE.MeshStandardMaterial({ color: 0xd8d8d0 });
   disposables.push(dashMaterial);
-  for (let z = 11.5; z < 47.5; z += 2.2) {
+  for (let z = 11.5; z < 49; z += 2.2) {
     const dash = box(dashMaterial, 2.5, 0.008, z, 0.14, 0.005, 0.9);
     dash.castShadow = false;
   }
@@ -157,10 +157,10 @@ export function buildExterior(): {
 
   // Invisible bounds so the crewmate stays on the lawn.
   colliders.push(
-    { minX: -28, maxX: 54, minZ: 51, maxZ: 52 }, // south
-    { minX: -28, maxX: 54, minZ: -14, maxZ: -13 }, // north
-    { minX: -17, maxX: -16, minZ: -14, maxZ: 52 }, // west
-    { minX: 48, maxX: 49, minZ: -14, maxZ: 52 }, // east
+    { minX: -52, maxX: 54, minZ: 64, maxZ: 65 }, // south
+    { minX: -52, maxX: 54, minZ: -32, maxZ: -31 }, // north
+    { minX: -51, maxX: -50, minZ: -32, maxZ: 65 }, // west
+    { minX: 48, maxX: 49, minZ: -32, maxZ: 65 }, // east
   );
 
   return {

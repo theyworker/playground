@@ -10,6 +10,9 @@ import { buildTycoon } from "./tycoon";
 import { buildDevind } from "./devind";
 import { buildCmyna } from "./cmyna";
 import { buildLake } from "./lake";
+import { buildPilates } from "./pilates";
+import { buildMansion } from "./mansion";
+import { bakeStatic } from "./bake-static";
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_SPEED = 3.2;
@@ -45,7 +48,10 @@ export function createGameScene(container: HTMLElement): () => void {
     100,
   );
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: "high-performance",
+  });
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -57,10 +63,10 @@ export function createGameScene(container: HTMLElement): () => void {
   sun.position.set(6, 12, 4);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -42;
-  sun.shadow.camera.right = 42;
-  sun.shadow.camera.top = 42;
-  sun.shadow.camera.bottom = -42;
+  sun.shadow.camera.left = -58;
+  sun.shadow.camera.right = 58;
+  sun.shadow.camera.top = 58;
+  sun.shadow.camera.bottom = -58;
   scene.add(sun);
 
   const house = buildHouse();
@@ -105,6 +111,23 @@ export function createGameScene(container: HTMLElement): () => void {
   const lake = buildLake();
   scene.add(lake.group);
   house.colliders.push(...lake.colliders);
+
+  const pilates = buildPilates();
+  scene.add(pilates.group);
+  house.colliders.push(...pilates.colliders);
+
+  const mansion = buildMansion();
+  scene.add(mansion.group);
+  house.colliders.push(...mansion.colliders);
+
+  // Merge all static meshes into one mesh per material — draw calls drop
+  // from ~2000 to a few hundred. Subtrees flagged userData.dynamic
+  // (commode lid, yacht) survive untouched; crewmate/shirts/circle are
+  // never baked.
+  const baked = [
+    house, exterior, restaurant, tycoon, devind, cmyna,
+    lake, pilates, mansion, washroom, tvRoom,
+  ].map((build) => bakeStatic(build.group));
 
   // M-key range circle, drawn flat on the floor around the character.
   const circleGeometry = new THREE.RingGeometry(
@@ -284,6 +307,9 @@ export function createGameScene(container: HTMLElement): () => void {
     devind.dispose();
     cmyna.dispose();
     lake.dispose();
+    pilates.dispose();
+    mansion.dispose();
+    baked.forEach((bake) => bake.dispose());
     circleGeometry.dispose();
     circleMaterial.dispose();
     renderer.dispose();

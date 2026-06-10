@@ -164,6 +164,7 @@ export function buildLake(): {
 
   // --- The Tycoon Yatch, superyacht edition (~18 units stem to stern) ---
   const yacht = new THREE.Group();
+  yacht.userData.dynamic = true; // bobs at anchor — excluded from baking
   yacht.position.set(37, 0, 26);
   yacht.rotation.y = 0.5;
 
