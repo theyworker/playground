@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import AvControls from "./av-controls";
+import MobileControls from "./mobile-controls";
 
 export default function PacMeetingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +37,8 @@ export default function PacMeetingPage() {
       </Link>
 
       <AvControls />
+
+      <MobileControls />
     </main>
   );
 }
