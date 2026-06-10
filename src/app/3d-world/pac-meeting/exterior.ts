@@ -60,11 +60,24 @@ export function buildExterior(): {
   group.add(road);
   disposables.push(roadGeometry, roadMaterial);
 
-  // Dashed center line.
+  // Branch road heading west to the WADX academy (between Devind's
+  // Place and the Pilates studio).
+  const branchGeometry = new THREE.PlaneGeometry(31.75, 2.5).rotateX(-Math.PI / 2);
+  const branch = new THREE.Mesh(branchGeometry, roadMaterial);
+  branch.position.set(-15.125, 0.004, 48);
+  branch.receiveShadow = true;
+  group.add(branch);
+  disposables.push(branchGeometry);
+
+  // Dashed center lines.
   const dashMaterial = new THREE.MeshStandardMaterial({ color: 0xd8d8d0 });
   disposables.push(dashMaterial);
   for (let z = 11.5; z < 49; z += 2.2) {
     const dash = box(dashMaterial, 2.5, 0.008, z, 0.14, 0.005, 0.9);
+    dash.castShadow = false;
+  }
+  for (let x = -29.5; x < -0.5; x += 2.2) {
+    const dash = box(dashMaterial, x, 0.008, 48, 0.9, 0.005, 0.14);
     dash.castShadow = false;
   }
 

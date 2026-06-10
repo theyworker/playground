@@ -13,6 +13,8 @@ import { buildLake } from "./lake";
 import { buildPilates } from "./pilates";
 import { buildMansion } from "./mansion";
 import { bakeStatic } from "./bake-static";
+import { createMusic } from "./music";
+import { buildWadx } from "./wadx";
 
 const PLAYER_RADIUS = 0.38;
 const PLAYER_SPEED = 3.2;
@@ -120,14 +122,20 @@ export function createGameScene(container: HTMLElement): () => void {
   scene.add(mansion.group);
   house.colliders.push(...mansion.colliders);
 
+  const wadx = buildWadx();
+  scene.add(wadx.group);
+  house.colliders.push(...wadx.colliders);
+
   // Merge all static meshes into one mesh per material — draw calls drop
   // from ~2000 to a few hundred. Subtrees flagged userData.dynamic
   // (commode lid, yacht) survive untouched; crewmate/shirts/circle are
   // never baked.
   const baked = [
     house, exterior, restaurant, tycoon, devind, cmyna,
-    lake, pilates, mansion, washroom, tvRoom,
+    lake, pilates, mansion, washroom, tvRoom, wadx,
   ].map((build) => bakeStatic(build.group));
+
+  const music = createMusic(camera, scene);
 
   // M-key range circle, drawn flat on the floor around the character.
   const circleGeometry = new THREE.RingGeometry(
@@ -309,7 +317,9 @@ export function createGameScene(container: HTMLElement): () => void {
     lake.dispose();
     pilates.dispose();
     mansion.dispose();
+    wadx.dispose();
     baked.forEach((bake) => bake.dispose());
+    music.dispose();
     circleGeometry.dispose();
     circleMaterial.dispose();
     renderer.dispose();

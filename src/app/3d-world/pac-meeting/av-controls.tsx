@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function MicIcon({ muted }: { muted: boolean }) {
   return (
@@ -65,6 +65,13 @@ function ToggleButton({
 export default function AvControls() {
   const [micMuted, setMicMuted] = useState(false);
   const [speakerMuted, setSpeakerMuted] = useState(false);
+
+  // The game scene listens for this to gate the world-music volume.
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("pac-speaker", { detail: { muted: speakerMuted } }),
+    );
+  }, [speakerMuted]);
 
   return (
     <div className="absolute bottom-6 right-6 z-10 flex gap-3">
