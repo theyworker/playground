@@ -256,7 +256,7 @@ export function createGameScene(container: HTMLElement): () => void {
     angleDelta = Math.atan2(Math.sin(angleDelta), Math.cos(angleDelta));
     crewmate.group.rotation.y += angleDelta * Math.min(1, delta * 12);
 
-    crewmate.group.rotation.z = moving ? Math.sin(walkPhase) * 0.04 : 0;
+    crewmate.update(delta, walkPhase, moving);
 
     circle.position.x = crewmate.group.position.x;
     circle.position.z = crewmate.group.position.z;
@@ -280,7 +280,7 @@ export function createGameScene(container: HTMLElement): () => void {
     camera.position.lerp(cameraTarget, Math.min(1, delta * (dragging ? 20 : 4)));
     camera.lookAt(
       crewmate.group.position.x,
-      crewmate.group.position.y + 0.6,
+      crewmate.group.position.y + 0.9,
       crewmate.group.position.z,
     );
 
