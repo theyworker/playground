@@ -168,6 +168,105 @@ export function buildExterior(): {
   group.add(car);
   colliders.push({ minX: 4.9, maxX: 6.3, minZ: 10.7, maxZ: 13.7 });
 
+  // --- Purple Toyota Vitz "Fake Taxi", parked across the road ---
+  const vitz = new THREE.Group();
+  vitz.position.set(-1.1, 0, 16.5);
+  const vitzPaintMaterial = new THREE.MeshStandardMaterial({
+    color: 0x7a2fbe,
+    metalness: 0.45,
+    roughness: 0.35,
+  });
+  disposables.push(vitzPaintMaterial);
+
+  const vitzBox = (
+    material: THREE.Material,
+    x: number, y: number, z: number,
+    w: number, h: number, d: number,
+    tiltX = 0,
+  ) => {
+    const mesh = new THREE.Mesh(unitBox, material);
+    mesh.scale.set(w, h, d);
+    mesh.position.set(x, y, z);
+    mesh.rotation.x = tiltX;
+    mesh.castShadow = true;
+    vitz.add(mesh);
+    return mesh;
+  };
+
+  // Tall stubby hatchback (nose toward -z): body, big cabin, flat hatch.
+  vitzBox(vitzPaintMaterial, 0, 0.46, 0, 1.0, 0.4, 2.0);
+  vitzBox(vitzPaintMaterial, 0, 0.62, -0.78, 0.94, 0.1, 0.45, -0.12); // hood
+  vitzBox(glassMaterial, 0, 0.92, 0.12, 0.88, 0.3, 1.3);
+  vitzBox(vitzPaintMaterial, 0, 1.12, 0.12, 0.92, 0.08, 1.42); // roof
+  vitzBox(vitzPaintMaterial, 0, 0.86, -0.62, 0.9, 0.08, 0.52, -0.55); // windshield rake
+  vitzBox(vitzPaintMaterial, 0, 0.9, 0.85, 0.9, 0.08, 0.4, 0.3); // rear hatch
+  vitzBox(lightMaterial, -0.32, 0.58, -1.01, 0.2, 0.1, 0.04);
+  vitzBox(lightMaterial, 0.32, 0.58, -1.01, 0.2, 0.1, 0.04);
+  for (const [wx, wz] of [[-0.5, -0.62], [0.5, -0.62], [-0.5, 0.62], [0.5, 0.62]]) {
+    const tire = new THREE.Mesh(tireGeometry, tireMaterial);
+    tire.position.set(wx, 0.19, wz);
+    tire.castShadow = true;
+    vitz.add(tire);
+    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+    rim.position.set(wx, 0.19, wz);
+    vitz.add(rim);
+  }
+
+  // "FAKE TAXI" livery: checkered banner with text, used on the roof
+  // sign (front/back faces) and as door decals on both sides.
+  const taxiCanvas = document.createElement("canvas");
+  taxiCanvas.width = 256;
+  taxiCanvas.height = 80;
+  const taxiCtx = taxiCanvas.getContext("2d")!;
+  taxiCtx.fillStyle = "#f7f4ea";
+  taxiCtx.fillRect(0, 0, 256, 80);
+  taxiCtx.fillStyle = "#1c1c1c";
+  for (let x = 0; x < 256; x += 32) {
+    taxiCtx.fillRect(x, 0, 16, 8);
+    taxiCtx.fillRect(x + 16, 8, 16, 8);
+    taxiCtx.fillRect(x + 16, 64, 16, 8);
+    taxiCtx.fillRect(x, 72, 16, 8);
+  }
+  taxiCtx.textAlign = "center";
+  taxiCtx.font = "bold 36px sans-serif";
+  taxiCtx.fillText("FAKE TAXI", 128, 53);
+  const taxiTexture = new THREE.CanvasTexture(taxiCanvas);
+  // Box back faces sample the texture mirrored; flip a copy for that side.
+  const taxiTextureFlipped = taxiTexture.clone();
+  taxiTextureFlipped.wrapS = THREE.RepeatWrapping;
+  taxiTextureFlipped.repeat.x = -1;
+  const taxiSignMaterial = new THREE.MeshStandardMaterial({ map: taxiTexture });
+  const taxiSignBackMaterial = new THREE.MeshStandardMaterial({
+    map: taxiTextureFlipped,
+  });
+  const taxiCapMaterial = new THREE.MeshStandardMaterial({ color: 0xf7f4ea });
+  disposables.push(
+    taxiTexture, taxiTextureFlipped,
+    taxiSignMaterial, taxiSignBackMaterial, taxiCapMaterial,
+  );
+
+  const signGeometry = new THREE.BoxGeometry(0.72, 0.22, 0.16);
+  disposables.push(signGeometry);
+  const sign = new THREE.Mesh(signGeometry, [
+    taxiCapMaterial, taxiCapMaterial, taxiCapMaterial,
+    taxiCapMaterial, taxiSignMaterial, taxiSignBackMaterial,
+  ]);
+  sign.position.set(0, 1.28, 0.12);
+  sign.castShadow = true;
+  vitz.add(sign);
+
+  const decalGeometry = new THREE.PlaneGeometry(0.95, 0.3);
+  disposables.push(decalGeometry);
+  for (const side of [-1, 1]) {
+    const decal = new THREE.Mesh(decalGeometry, taxiSignMaterial);
+    decal.position.set(side * 0.505, 0.5, 0);
+    decal.rotation.y = side * Math.PI / 2;
+    vitz.add(decal);
+  }
+
+  group.add(vitz);
+  colliders.push({ minX: -1.7, maxX: -0.5, minZ: 15.3, maxZ: 17.7 });
+
   // Invisible bounds so the crewmate stays on the lawn.
   colliders.push(
     { minX: -52, maxX: 54, minZ: 64, maxZ: 65 }, // south
