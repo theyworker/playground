@@ -3,6 +3,8 @@ import { Kit } from "../pac-meeting/mansion-kit";
 import { hash01 } from "./compile";
 import { sharedMaterial } from "./materials";
 import { colorFromText, pick, SKIN_TONES, TROUSER_PALETTE } from "./palette";
+import { faceMaterial, stripedMaterial } from "./textures";
+import type { Mood } from "./textures";
 import type { PlacedEntity } from "./compile";
 
 // Procedural human rig. A figure is a hierarchy of named pivot groups —
@@ -145,21 +147,24 @@ function buildRig(
   tintOverride?: number,
 ): PersonRig {
   const geometry = geometryFor(kit);
+  const topTint = tintOverride ?? colorFromText(entity.descriptor, entity.id);
+  const skinTint = pick(SKIN_TONES, `${entity.id}:skin`);
+  // A seeded minority of the cast wears a striped top for variety.
+  const striped =
+    tintOverride === undefined && hash01(`${entity.id}:pattern`) < 0.35;
   const outfit: Outfit = {
-    top: sharedMaterial({
-      color: tintOverride ?? colorFromText(entity.descriptor, entity.id),
-      roughness: 0.85,
-    }),
+    top: striped
+      ? stripedMaterial(topTint)
+      : sharedMaterial({ color: topTint, roughness: 0.85 }),
     trousers: sharedMaterial({
       color: tintOverride ?? pick(TROUSER_PALETTE, `${entity.id}:trousers`),
       roughness: 0.85,
     }),
-    skin: sharedMaterial({
-      color: pick(SKIN_TONES, `${entity.id}:skin`),
-      roughness: 0.65,
-    }),
+    skin: sharedMaterial({ color: skinTint, roughness: 0.65 }),
     shoes: sharedMaterial({ color: SHOE, roughness: 0.6 }),
   };
+  const moods: Mood[] = ["calm", "smile", "open"];
+  const mood = moods[Math.floor(hash01(`${entity.id}:mood`) * 3) % 3];
 
   const pose = new THREE.Group();
   pose.name = "person";
@@ -183,7 +188,9 @@ function buildRig(
   head.name = "head";
   head.position.y = NECK_Y;
   torso.add(head);
-  const skull = kit.mesh(geometry.head, outfit.skin, 0, 0.11, 0, head);
+  // The face texture's background matches the skin tint, so the head
+  // blends seamlessly with the plain-skin neck and hands.
+  const skull = kit.mesh(geometry.head, faceMaterial(skinTint, mood), 0, 0.11, 0, head);
   skull.scale.y = 1.15;
 
   return {

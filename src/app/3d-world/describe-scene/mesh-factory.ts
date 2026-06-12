@@ -3,6 +3,12 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { Kit } from "../pac-meeting/mansion-kit";
 import { hash01 } from "./compile";
 import { finish, sharedMaterial } from "./materials";
+import {
+  fitText,
+  foliageMaterial,
+  surfaceMaterial,
+  woodMaterial,
+} from "./textures";
 import { colorFromText } from "./palette";
 import { buildPerson } from "./person";
 import type { Update } from "./person";
@@ -26,11 +32,12 @@ export interface BuiltScene {
   fallbacks: string[];
 }
 
-// Kit.canvasPlane always parents into kit.group; entities need planes
-// inside their own group, so this mirrors it with a parent parameter.
+// A drawn plane backed by the procedural texture cache: the same key
+// reuses the same texture/material across rebuilds and scene switches.
 function canvasPlane(
   kit: Kit,
   parent: THREE.Object3D,
+  key: string,
   draw: (ctx: CanvasRenderingContext2D) => void,
   canvasW: number,
   canvasH: number,
@@ -42,19 +49,10 @@ function canvasPlane(
   rotationY = 0,
   transparent = false,
 ): THREE.Mesh {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvasW;
-  canvas.height = canvasH;
-  draw(canvas.getContext("2d")!);
-  const texture = kit.track(new THREE.CanvasTexture(canvas));
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const material = kit.track(
-    new THREE.MeshStandardMaterial({
-      map: texture,
-      roughness: 0.9,
-      ...(transparent && { transparent: true }),
-    }),
-  );
+  const material = surfaceMaterial(key, canvasW, canvasH, draw, {
+    roughness: 0.9,
+    transparent,
+  });
   const geometry = kit.track(new THREE.PlaneGeometry(planeW, planeH));
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(x, y, z);
@@ -144,7 +142,7 @@ function buildSuitedDog(kit: Kit, parent: THREE.Group): undefined {
   const fur = sharedMaterial({ color: 0xb08d57, roughness: 0.9 });
   // The "suit" is a canvas texture wrapped on the body box.
   const suitBody = canvasPlane(
-    kit, parent,
+    kit, parent, "dog-suit",
     (ctx) => {
       ctx.fillStyle = "#2c3e63";
       ctx.fillRect(0, 0, 128, 128);
@@ -313,16 +311,16 @@ const buildFountain: ObjectBuilder = (kit, parent) => {
 };
 
 const buildTree: ObjectBuilder = (kit, parent) => {
-  const bark = finish.wood(0x5d4023);
-  const leafDark = finish.fabric(0x3a6b35);
-  const leafLight = finish.fabric(0x4c7e3e);
+  const bark = woodMaterial(0x5d4023, 0.95);
+  const leafDark = foliageMaterial(0x3a6b35);
+  const leafLight = foliageMaterial(0x4c7e3e);
   kit.mesh(kit.track(new THREE.CylinderGeometry(0.17, 0.3, 1.7, 10)), bark, 0, 0.85, 0, parent);
   kit.mesh(kit.track(new THREE.CylinderGeometry(0.3, 0.46, 0.18, 10)), bark, 0, 0.09, 0, parent); // root flare
   const limb = kit.mesh(
     kit.track(new THREE.CylinderGeometry(0.06, 0.1, 0.7, 8)), bark, 0.34, 1.5, 0.1, parent,
   );
   limb.rotation.z = -0.7;
-  // Two-tone foliage clusters so the crown reads as a mass of leaves.
+  // Two-tone speckled foliage so the crown reads as a mass of leaves.
   const crownGeometry = kit.track(new THREE.SphereGeometry(0.85, 14, 10));
   kit.mesh(crownGeometry, leafDark, 0, 2.15, 0, parent);
   const tuftGeometry = kit.track(new THREE.SphereGeometry(0.55, 12, 9));
@@ -334,9 +332,9 @@ const buildTree: ObjectBuilder = (kit, parent) => {
 };
 
 const buildCounter: ObjectBuilder = (kit, parent) => {
-  const wood = finish.wood(0x5d4023);
-  const facing = finish.wood(0x6b4a2c);
-  const top = finish.ceramic(0x3d2a16); // polished counter top
+  const wood = woodMaterial(0x5d4023);
+  const facing = woodMaterial(0x6b4a2c);
+  const top = woodMaterial(0x3d2a16, 0.4); // polished counter top
   const brass = finish.metal(0xb08d3a);
   const dark = finish.plastic(0x2b2e33);
   rbox(kit, wood, 0, 0.44, 0, 2.8, 0.88, 0.7, parent, 0.03);
@@ -417,37 +415,67 @@ const buildBoard: ObjectBuilder = (kit, parent, entity) => {
     rbox(kit, frame, x, 0, 0.01, 0.07, 0.95, 0.07, parent, 0.018);
   }
   rbox(kit, frame, 0, -0.54, 0.06, 1.0, 0.04, 0.12, parent, 0.012); // chalk ledge
+  const title = entity.descriptor.split(" — ")[0].toUpperCase();
+  const isMenu = /menu|caf|coffee/.test(entity.descriptor.toLowerCase());
   canvasPlane(
-    kit, parent,
+    kit, parent, `board:${title}:${isMenu}`,
     (ctx) => {
       ctx.fillStyle = "#22301f";
-      ctx.fillRect(0, 0, 512, 320);
+      ctx.fillRect(0, 0, 1024, 640);
       ctx.fillStyle = "#e8e4d2";
-      ctx.font = "bold 56px serif";
       ctx.textAlign = "center";
-      const title = entity.descriptor.split(" — ")[0].toUpperCase();
-      ctx.fillText(title.slice(0, 18), 256, 78);
+      fitText(ctx, title, 860, "bold {size}px Georgia, 'Times New Roman', serif", 96);
+      ctx.fillText(title, 512, 122);
       ctx.strokeStyle = "#cdc8b4";
-      ctx.lineWidth = 5;
-      for (let y = 130; y <= 270; y += 46) {
-        ctx.beginPath();
-        ctx.moveTo(70, y);
-        ctx.lineTo(330 + (y % 92), y);
-        ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(120, 158);
+      ctx.lineTo(904, 158);
+      ctx.stroke();
+      if (isMenu) {
+        // Readable chalk menu: items left, prices right.
+        const items: [string, string][] = [
+          ["Espresso", "2.50"],
+          ["Flat White", "3.80"],
+          ["Croissant", "3.20"],
+          ["Muffin", "2.80"],
+        ];
+        ctx.font = "52px Georgia, 'Times New Roman', serif";
+        items.forEach(([item, price], i) => {
+          const y = 250 + i * 92;
+          ctx.textAlign = "left";
+          ctx.fillText(item, 120, y);
+          ctx.textAlign = "right";
+          ctx.fillText(price, 800, y);
+        });
+      } else {
+        ctx.lineWidth = 8;
+        for (let y = 250; y <= 540; y += 92) {
+          ctx.beginPath();
+          ctx.moveTo(120, y);
+          ctx.lineTo(620 + (y % 184), y);
+          ctx.stroke();
+        }
       }
       // The doodle of a coffee cup.
-      ctx.strokeRect(404, 180, 60, 70);
+      ctx.strokeStyle = "#e8e4d2";
+      ctx.lineWidth = 7;
+      ctx.strokeRect(852, 380, 96, 120);
       ctx.beginPath();
-      ctx.arc(470, 215, 18, -Math.PI / 2, Math.PI / 2);
+      ctx.arc(958, 440, 30, -Math.PI / 2, Math.PI / 2);
+      ctx.stroke();
+      ctx.beginPath(); // steam
+      ctx.moveTo(880, 350);
+      ctx.bezierCurveTo(870, 320, 900, 310, 892, 282);
       ctx.stroke();
     },
-    512, 320, 1.36, 0.82, 0, 0, 0.035,
+    1024, 640, 1.36, 0.82, 0, 0, 0.035,
   );
   return undefined;
 };
 
 const buildTable: ObjectBuilder = (kit, parent, entity) => {
-  const wood = woodOf(entity);
+  const wood = woodMaterial(colorFromText(entity.descriptor, entity.id));
   if (/round/.test(entity.descriptor.toLowerCase())) {
     // Café pedestal table: top with a rim, stem, weighted foot.
     kit.mesh(kit.track(new THREE.CylinderGeometry(0.48, 0.48, 0.05, 24)), wood, 0, 0.715, 0, parent);
@@ -549,27 +577,46 @@ const buildShelter: ObjectBuilder = (kit, parent) => {
   rbox(kit, steel, 0, 2.24, 0, 2.9, 0.08, 1.4, parent, 0.025); // roof
   rbox(kit, steel, 0, 2.18, 0.71, 2.9, 0.14, 0.04, parent, 0.015); // fascia
   canvasPlane(
-    kit, parent,
+    kit, parent, "route-map",
     (ctx) => {
       ctx.fillStyle = "#e8e4d8";
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = "#2c3e63";
-      ctx.lineWidth = 6;
-      ctx.strokeRect(8, 8, 240, 240);
+      ctx.fillRect(0, 0, 512, 512);
       ctx.fillStyle = "#2c3e63";
-      ctx.font = "bold 34px sans-serif";
+      ctx.fillRect(0, 0, 512, 96); // header band
+      ctx.fillStyle = "#f1f5f9";
+      ctx.font = "bold 56px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("ROUTE MAP", 128, 52);
+      ctx.fillText("ROUTE MAP", 256, 66);
+      ctx.strokeStyle = "#2c3e63";
+      ctx.lineWidth = 8;
+      ctx.strokeRect(10, 10, 492, 492);
+      // The line and its stops.
+      ctx.lineWidth = 10;
       ctx.beginPath();
-      ctx.moveTo(36, 200); ctx.lineTo(110, 120); ctx.lineTo(220, 150);
+      ctx.moveTo(70, 420);
+      ctx.lineTo(210, 250);
+      ctx.lineTo(430, 310);
       ctx.stroke();
-      for (const [x, y] of [[36, 200], [110, 120], [220, 150]]) {
+      ctx.font = "500 30px system-ui, sans-serif";
+      const stops: [number, number, string][] = [
+        [70, 420, "Depot"],
+        [210, 250, "Centre"],
+        [430, 310, "Harbour"],
+      ];
+      for (const [x, y, label] of stops) {
+        ctx.fillStyle = "#2c3e63";
         ctx.beginPath();
-        ctx.arc(x, y, 9, 0, Math.PI * 2);
+        ctx.arc(x, y, 16, 0, Math.PI * 2);
         ctx.fill();
+        ctx.fillStyle = "#f8fafc";
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#2c3e63";
+        ctx.fillText(label, x, y - 28);
       }
     },
-    256, 256, 0.7, 0.7, 0.6, 1.3, -0.51,
+    512, 512, 0.7, 0.7, 0.6, 1.3, -0.51,
   );
   return undefined;
 };
@@ -581,21 +628,27 @@ const buildSign: ObjectBuilder = (kit, parent, entity) => {
   const routeNumber = /\d+/.exec(entity.descriptor)?.[0] ?? "BUS";
   kit.box(steel, 0, 2.15, 0.02, 0.6, 0.46, 0.03, false, parent); // panel backing
   canvasPlane(
-    kit, parent,
+    kit, parent, `sign:${routeNumber}`,
     (ctx) => {
       ctx.fillStyle = "#2c3e63";
-      ctx.fillRect(0, 0, 256, 192);
+      ctx.fillRect(0, 0, 512, 384);
       ctx.strokeStyle = "#f1f5f9";
-      ctx.lineWidth = 8;
-      ctx.strokeRect(8, 8, 240, 176);
+      ctx.lineWidth = 12;
+      ctx.strokeRect(16, 16, 480, 352);
       ctx.fillStyle = "#f1f5f9";
       ctx.textAlign = "center";
-      ctx.font = "bold 40px sans-serif";
-      ctx.fillText("BUS STOP", 128, 70);
-      ctx.font = "bold 72px sans-serif";
-      ctx.fillText(routeNumber, 128, 155);
+      ctx.font = "bold 76px system-ui, sans-serif";
+      ctx.fillText("BUS STOP", 256, 130);
+      ctx.strokeStyle = "#f1f5f9";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(96, 168);
+      ctx.lineTo(416, 168);
+      ctx.stroke();
+      fitText(ctx, routeNumber, 400, "bold {size}px system-ui, sans-serif", 150);
+      ctx.fillText(routeNumber, 256, 312);
     },
-    256, 192, 0.56, 0.42, 0, 2.15, 0.04,
+    512, 384, 0.56, 0.42, 0, 2.15, 0.04,
   );
   return undefined;
 };
@@ -630,8 +683,8 @@ const buildCup: ObjectBuilder = (kit, parent) => {
 
 const buildPlant: ObjectBuilder = (kit, parent) => {
   const clay = finish.stone(0xa05a37);
-  const leafDark = finish.fabric(0x3a6b35);
-  const leafLight = finish.fabric(0x4c7e3e);
+  const leafDark = foliageMaterial(0x3a6b35);
+  const leafLight = foliageMaterial(0x4c7e3e);
   kit.mesh(kit.track(new THREE.CylinderGeometry(0.16, 0.115, 0.24, 14)), clay, 0, 0.12, 0, parent);
   kit.mesh(kit.track(new THREE.CylinderGeometry(0.17, 0.17, 0.045, 14)), clay, 0, 0.245, 0, parent); // rim
   const bushGeometry = kit.track(new THREE.SphereGeometry(0.16, 10, 8));
@@ -702,8 +755,9 @@ function buildPlaceholder(kit: Kit, parent: THREE.Group, entity: PlacedEntity): 
     roughness: 0.8,
   });
   rbox(kit, tint, 0, 0.4, 0, 0.66, 0.8, 0.66, parent, 0.05);
+  const label = entity.descriptor.slice(0, 48);
   canvasPlane(
-    kit, parent,
+    kit, parent, `placeholder:${label}`,
     (ctx) => {
       ctx.clearRect(0, 0, 512, 96);
       ctx.fillStyle = "rgba(16, 20, 31, 0.92)";
@@ -714,9 +768,9 @@ function buildPlaceholder(kit: Kit, parent: THREE.Group, entity: PlacedEntity): 
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.fillStyle = "#f1f5f9";
-      ctx.font = "500 28px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(entity.descriptor.slice(0, 36), 256, 58);
+      fitText(ctx, label, 460, "500 {size}px system-ui, sans-serif", 30);
+      ctx.fillText(label, 256, 58);
     },
     512, 96, 1.6, 0.3, 0, 1.05, 0, 0, true,
   );

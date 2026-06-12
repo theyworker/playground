@@ -5,6 +5,7 @@ import { compileScene } from "./compile";
 import { buildSceneMeshes, BuiltScene } from "./mesh-factory";
 import { buildEnvironment, EnvironmentBuild } from "./environment";
 import { disposeSharedMaterials } from "./materials";
+import { disposeProceduralTextures, setTextureAnisotropy } from "./textures";
 import type { SceneSpec } from "./types";
 
 export interface SceneReport {
@@ -45,6 +46,7 @@ export function createStageScene(container: HTMLElement): StageHandle {
   // r184 deprecated PCFSoftShadowMap; PCF + shadow.radius gives soft edges.
   renderer.shadowMap.type = THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
+  setTextureAnisotropy(renderer.capabilities.getMaxAnisotropy());
 
   // Image-based lighting without assets: the built-in RoomEnvironment is a
   // procedural studio box prefiltered through PMREM. Kept subtle so the
@@ -156,6 +158,7 @@ export function createStageScene(container: HTMLElement): StageHandle {
       environment?.dispose();
       environmentTexture.dispose();
       disposeSharedMaterials();
+      disposeProceduralTextures();
       renderer.dispose();
       container.removeChild(renderer.domElement);
     },

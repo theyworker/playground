@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Kit } from "../pac-meeting/mansion-kit";
 import { sharedMaterial } from "./materials";
+import { groundMaterial, plankMaterial, proceduralTexture } from "./textures";
 import type { SceneSetting } from "./types";
 
 // Setting-driven stage dressing: lights tuned by time_of_day/weather,
@@ -126,12 +127,27 @@ function buildRain(kit: Kit, indoor: boolean): {
   }
   const geometry = kit.track(new THREE.BufferGeometry());
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  // A soft vertical streak sprite; untextured points render as squares.
+  const drop = proceduralTexture("raindrop", 32, 32, (ctx) => {
+    const gradient = ctx.createLinearGradient(16, 2, 16, 30);
+    gradient.addColorStop(0, "rgba(255,255,255,0)");
+    gradient.addColorStop(0.5, "rgba(255,255,255,0.9)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(16, 3);
+    ctx.lineTo(16, 29);
+    ctx.stroke();
+  });
   const material = kit.track(
     new THREE.PointsMaterial({
       color: 0x8fa3c4,
-      size: 0.05,
+      size: 0.08,
+      map: drop,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.55,
       depthWrite: false,
     }),
   );
@@ -155,7 +171,7 @@ export function buildEnvironment(setting: SceneSetting): EnvironmentBuild {
   const rainy = /rain|storm|drizzle/.test(setting.weather.toLowerCase());
 
   if (setting.indoor) {
-    const floor = sharedMaterial({ color: 0x6b4a2c, roughness: 0.8 });
+    const floor = plankMaterial(0x6b4a2c);
     const wall = sharedMaterial({ color: 0xd9cdb4, roughness: 0.95 });
     const trim = sharedMaterial({ color: 0x4a3a28, roughness: 0.85 });
     const width = ROOM_HALF_X * 2;
@@ -177,10 +193,7 @@ export function buildEnvironment(setting: SceneSetting): EnvironmentBuild {
     outside.receiveShadow = true;
     kit.group.add(outside);
   } else {
-    const ground = sharedMaterial({
-      color: groundColorFor(setting),
-      roughness: 0.95,
-    });
+    const ground = groundMaterial(groundColorFor(setting));
     const groundGeometry = kit.track(
       new THREE.CircleGeometry(15, 64).rotateX(-Math.PI / 2),
     );
