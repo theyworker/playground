@@ -719,6 +719,67 @@ const buildSign: ObjectBuilder = (kit, parent, entity) => {
   return undefined;
 };
 
+// A hanging pendant (cord + open shade + glowing bulb) for "pendant lamp
+// hanging above the table" entities; the freestanding buildLamp above
+// covers floor/table lamps. The shade needs DoubleSide and the bulb an
+// emissive tint, which the shared-material cache deliberately never
+// carries, so those two stay kit-tracked one-offs.
+const buildPendantLamp: ObjectBuilder = (kit, parent) => {
+  const brass = finish.metal(0xb08d3a);
+  const cordGeometry = kit.track(new THREE.CylinderGeometry(0.012, 0.012, 1.2, 6));
+  kit.mesh(cordGeometry, brass, 0, 0.7, 0, parent);
+  const shadeMaterial = kit.material({
+    color: 0xb08d3a, metalness: 0.7, roughness: 0.35,
+    side: THREE.DoubleSide,
+  });
+  const shadeGeometry = kit.track(new THREE.ConeGeometry(0.24, 0.2, 16, 1, true));
+  kit.mesh(shadeGeometry, shadeMaterial, 0, 0.12, 0, parent);
+  const bulbMaterial = kit.material({
+    color: 0xffe9b8, emissive: 0xffd98a, emissiveIntensity: 1.2,
+  });
+  const bulbGeometry = kit.track(new THREE.SphereGeometry(0.05, 10, 8));
+  const bulb = kit.mesh(bulbGeometry, bulbMaterial, 0, 0.04, 0, parent);
+  bulb.castShadow = false;
+  const glow = kit.track(new THREE.PointLight(0xffd9a0, 0.7, 6, 2));
+  parent.add(glow);
+  return undefined;
+};
+
+const buildClock: ObjectBuilder = (kit, parent) => {
+  const brass = finish.metal(0xb08d3a);
+  const bodyGeometry = kit.track(
+    new THREE.CylinderGeometry(0.26, 0.26, 0.06, 24).rotateX(Math.PI / 2),
+  );
+  kit.mesh(bodyGeometry, brass, 0, 0, 0, parent);
+  const face = new THREE.Mesh(
+    kit.track(new THREE.CircleGeometry(0.23, 24)),
+    surfaceMaterial("clock-face", 128, 128, (ctx) => {
+      ctx.fillStyle = "#f1ecdf";
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.strokeStyle = "#2b2e33";
+      ctx.lineWidth = 4;
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(64 + Math.cos(angle) * 48, 64 + Math.sin(angle) * 48);
+        ctx.lineTo(64 + Math.cos(angle) * 56, 64 + Math.sin(angle) * 56);
+        ctx.stroke();
+      }
+      // Hands frozen at ten past ten, the classic shop-clock pose.
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(64, 64);
+      ctx.lineTo(64 + Math.cos(-Math.PI * 0.83) * 30, 64 + Math.sin(-Math.PI * 0.83) * 30);
+      ctx.moveTo(64, 64);
+      ctx.lineTo(64 + Math.cos(-Math.PI * 0.17) * 42, 64 + Math.sin(-Math.PI * 0.17) * 42);
+      ctx.stroke();
+    }),
+  );
+  face.position.z = 0.035;
+  parent.add(face);
+  return undefined;
+};
+
 const buildBriefcase: ObjectBuilder = (kit, parent) => {
   const leather = finish.wood(0x5d3a1e); // matte leather
   const brass = finish.metal(0xb08d3a);
@@ -1083,6 +1144,28 @@ const buildShelf: ObjectBuilder = (kit, parent, entity) => {
   for (const y of [0.3, 0.8, 1.3]) {
     rbox(kit, wood, 0, y, 0, 1.16, 0.05, 0.32, parent, 0.012);
   }
+  if (/book|paperback/.test(entity.descriptor.toLowerCase())) {
+    const palette = [0xb04a4a, 0x4a6fb0, 0x4ab06f, 0xb0974a].map((color) =>
+      finish.fabric(color),
+    );
+    // Deterministic ragged row of spines on the lower two boards.
+    for (const boardY of [0.3, 0.8]) {
+      let x = -0.5;
+      let i = 0;
+      while (x < 0.42) {
+        const width = 0.07 + ((i * 7) % 4) * 0.015;
+        const height = 0.26 + ((i * 3) % 3) * 0.03;
+        kit.box(
+          palette[i % palette.length],
+          x + width / 2, boardY + 0.025 + height / 2, 0,
+          width, height, 0.24,
+          false, parent,
+        );
+        x += width + 0.015;
+        i++;
+      }
+    }
+  }
   return undefined;
 };
 
@@ -1090,6 +1173,10 @@ const buildShelf: ObjectBuilder = (kit, parent, entity) => {
 const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/umbrella stand/, buildUmbrellaStand],
   [/stop sign|bus sign|street sign/, buildSign],
+  // "lamp hanging over the tables" must not hit the table builder; the
+  // generic /lamp/ further down covers freestanding lamps.
+  [/pendant|hanging lamp|lantern/, buildPendantLamp],
+  [/clock/, buildClock],
   // "shelter bench" must hit the bench builder, not the shelter one.
   [/bench/, buildBench],
   [/shelter/, buildShelter],

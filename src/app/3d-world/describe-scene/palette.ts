@@ -19,6 +19,7 @@ export const COLOR_WORDS: [RegExp, number][] = [
   [/\bbrown\b|\bleather\b|\bwood(en)?\b/, 0x6b4a2c],
   [/\bpink\b/, 0xd98ca6],
   [/\bpurple\b/, 0x7a5ba6],
+  [/\bmarble\b/, 0xd9d6ce],
 ];
 
 /** Muted clothing/prop tints that sit well together under the stage light. */

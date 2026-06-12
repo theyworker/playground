@@ -189,6 +189,24 @@
         "description": "a small boy with a hot chocolate moustache",
         "action": "kneeling on his chair and waving at the door",
         "position": "background left, beside his mother"
+      },
+      {
+        "id": "p_regular_red",
+        "description": "a man in a red t-shirt",
+        "action": "sitting with an espresso and reading the sports pages",
+        "position": "midground left, near the second café table"
+      },
+      {
+        "id": "p_regular_green",
+        "description": "a man in a green t-shirt",
+        "action": "sitting and typing on his laptop",
+        "position": "midground right, near the third café table"
+      },
+      {
+        "id": "p_regular_blue",
+        "description": "a man in a blue t-shirt",
+        "action": "sitting and drinking a flat white",
+        "position": "foreground centre, near the fourth café table"
       }
     ],
     "objects": [
@@ -227,6 +245,48 @@
         "name": "umbrella stand",
         "position": "foreground left, beside the entrance door",
         "detail": "metal bucket already crowded with dripping umbrellas"
+      },
+      {
+        "id": "o_table_second",
+        "name": "second café table",
+        "position": "midground left",
+        "detail": "small round bistro table with a marble top"
+      },
+      {
+        "id": "o_table_third",
+        "name": "third café table",
+        "position": "midground right",
+        "detail": "small round bistro table with a marble top"
+      },
+      {
+        "id": "o_table_fourth",
+        "name": "fourth café table",
+        "position": "foreground centre",
+        "detail": "small round bistro table with a marble top"
+      },
+      {
+        "id": "o_pendant_lamp",
+        "name": "pendant lamp",
+        "position": "above the second café table",
+        "detail": "warm brass lamp hanging from a long cord"
+      },
+      {
+        "id": "o_bookshelf",
+        "name": "bookshelf",
+        "position": "background right, against the back wall",
+        "detail": "narrow wooden bookcase stacked with worn paperbacks"
+      },
+      {
+        "id": "o_wall_clock",
+        "name": "wall clock",
+        "position": "high above the pastry case, on the back wall",
+        "detail": "round station clock with a brass rim"
+      },
+      {
+        "id": "o_plant_fern",
+        "name": "potted fern",
+        "position": "foreground left, beside the umbrella stand",
+        "detail": "leafy green fern in a terracotta pot"
       }
     ],
     "spatial_relationships": [
@@ -264,16 +324,46 @@
         "subject": "p_child",
         "relation": "is sitting next to",
         "target": "p_mother"
+      },
+      {
+        "subject": "p_regular_red",
+        "relation": "is sitting at",
+        "target": "o_table_second"
+      },
+      {
+        "subject": "p_regular_green",
+        "relation": "is sitting at",
+        "target": "o_table_third"
+      },
+      {
+        "subject": "p_regular_blue",
+        "relation": "is sitting at",
+        "target": "o_table_fourth"
+      },
+      {
+        "subject": "o_pendant_lamp",
+        "relation": "is hanging above",
+        "target": "o_table_second"
+      },
+      {
+        "subject": "o_wall_clock",
+        "relation": "is mounted above",
+        "target": "o_pastry_case"
+      },
+      {
+        "subject": "o_plant_fern",
+        "relation": "is standing beside",
+        "target": "o_umbrella_stand"
       }
     ],
     "anomaly": null,
     "elements": {
       "counts": {
-        "people": 5,
-        "objects": 6
+        "people": 8,
+        "objects": 13
       }
     },
-    "model_answer": "This is a busy corner café on a rainy morning. Behind the counter at the back, a barista in a black apron is steaming milk at a chrome espresso machine, and a chalkboard menu hangs above her. At the right end of the counter there is a glass pastry case full of croissants, and a man in a navy suit is waiting in front of it, checking his phone while holding a wet umbrella. In the foreground on the right, a student wearing headphones is typing on a laptop at a small window table; you can see rain streaking the glass behind him. In the back left corner, a mother in a yellow raincoat is wiping the table while her little boy kneels on his chair and waves at the door. Next to the entrance, a metal umbrella stand is already crowded with dripping umbrellas, so it is clearly a wet and hectic start to the day."
+    "model_answer": "This is a busy corner café on a rainy morning. Behind the counter at the back, a barista in a black apron is steaming milk at a chrome espresso machine, and a chalkboard menu hangs above her. At the right end of the counter there is a glass pastry case full of croissants, and a man in a navy suit is waiting in front of it, checking his phone while holding a wet umbrella. In the foreground on the right, a student wearing headphones is typing on a laptop at a small window table; you can see rain streaking the glass behind him. In the back left corner, a mother in a yellow raincoat is wiping the table while her little boy kneels on his chair and waves at the door. Next to the entrance, a metal umbrella stand is already crowded with dripping umbrellas, with a leafy potted fern standing beside it. Three matching marble-topped bistro tables are dotted around the room, and at each one sits what looks like the same man in a different coloured t-shirt — one in red reading the sports pages under a warm brass pendant lamp, one in green typing on a laptop, and one in blue drinking a flat white. A narrow bookshelf full of worn paperbacks stands against the back wall, and a station clock with a brass rim hangs high above the pastry case, so it is clearly a wet and hectic start to the day."
   },
   {
     "id": "bus-stop-diver",
