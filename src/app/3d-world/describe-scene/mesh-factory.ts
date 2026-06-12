@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Kit } from "../pac-meeting/mansion-kit";
 import { hash01 } from "./compile";
+import { sharedMaterial } from "./materials";
 import type { PlacedEntity } from "./compile";
 
 // Procedural mesh factory: turns compiled PlacedEntity records into
@@ -8,6 +9,10 @@ import type { PlacedEntity } from "./compile";
 // text. No external assets — boxes, spheres, capsules, cylinders, and
 // canvas textures only. Any descriptor without a mapping falls back to a
 // tinted, labeled box so a scene can never fail to render.
+//
+// Materials come from the sharedMaterial cache (one instance per tint) and
+// are never tracked on the kit — only geometries and canvas textures are
+// per-scene disposables.
 
 export interface BuiltScene {
   group: THREE.Group;
@@ -69,7 +74,10 @@ function canvasPlane(
   canvas.height = canvasH;
   draw(canvas.getContext("2d")!);
   const texture = kit.track(new THREE.CanvasTexture(canvas));
-  const material = kit.track(new THREE.MeshStandardMaterial({ map: texture }));
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = kit.track(
+    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 }),
+  );
   const geometry = kit.track(new THREE.PlaneGeometry(planeW, planeH));
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(x, y, z);
@@ -102,8 +110,8 @@ function buildPersonRig(
   const pose = new THREE.Group();
   parent.add(pose);
 
-  const bodyMaterial = kit.material({ color: tint, roughness: 0.8 });
-  const skinMaterial = kit.material({ color: SKIN, roughness: 0.7 });
+  const bodyMaterial = sharedMaterial({ color: tint, roughness: 0.8 });
+  const skinMaterial = sharedMaterial({ color: SKIN, roughness: 0.7 });
 
   const torsoGeometry = kit.track(new THREE.CapsuleGeometry(0.22, 0.45, 4, 12));
   kit.mesh(torsoGeometry, bodyMaterial, 0, 1.15, 0, pose);
@@ -173,7 +181,7 @@ function foldSeated(kit: Kit, rig: PersonRig, parent: THREE.Group, anchored: boo
   rig.rightLeg.rotation.x = -1.35;
   if (!anchored) {
     rig.pose.position.y += 0.5;
-    const seatMaterial = kit.material({ color: 0x4a3a28, roughness: 0.9 });
+    const seatMaterial = sharedMaterial({ color: 0x4a3a28, roughness: 0.9 });
     kit.box(seatMaterial, 0, 0.24, -0.05, 0.5, 0.48, 0.5, false, parent);
   }
 }
@@ -184,8 +192,8 @@ function buildPersonPose(
   pose: PoseName,
   seated: boolean,
 ): Update | undefined {
-  const propMaterial = kit.material({ color: 0xd9d2c0, roughness: 0.85 });
-  const darkProp = kit.material({ color: 0x33363d, roughness: 0.6 });
+  const propMaterial = sharedMaterial({ color: 0xd9d2c0, roughness: 0.85 });
+  const darkProp = sharedMaterial({ color: 0x33363d, roughness: 0.6 });
 
   switch (pose) {
     case "run": {
@@ -302,8 +310,8 @@ function anomalyScale(descriptor: string): number {
 
 function buildScubaDiver(kit: Kit, parent: THREE.Group, entity: PlacedEntity): Update | undefined {
   const update = buildPerson(kit, parent, entity, 0x23282f);
-  const gearMaterial = kit.material({ color: 0x8a929c, metalness: 0.5, roughness: 0.4 });
-  const rubberMaterial = kit.material({ color: 0x1b1e24, roughness: 0.9 });
+  const gearMaterial = sharedMaterial({ color: 0x8a929c, metalness: 0.5, roughness: 0.4 });
+  const rubberMaterial = sharedMaterial({ color: 0x1b1e24, roughness: 0.9 });
   // Tank on the back.
   const tankGeometry = kit.track(new THREE.CylinderGeometry(0.12, 0.12, 0.55, 12));
   kit.mesh(tankGeometry, gearMaterial, 0, 1.2, -0.28, parent);
@@ -317,9 +325,9 @@ function buildScubaDiver(kit: Kit, parent: THREE.Group, entity: PlacedEntity): U
 }
 
 function buildPenguin(kit: Kit, parent: THREE.Group): Update {
-  const black = kit.material({ color: 0x1d2026, roughness: 0.8 });
-  const white = kit.material({ color: 0xe9e9e2, roughness: 0.8 });
-  const beak = kit.material({ color: 0xd9882b, roughness: 0.7 });
+  const black = sharedMaterial({ color: 0x1d2026, roughness: 0.8 });
+  const white = sharedMaterial({ color: 0xe9e9e2, roughness: 0.8 });
+  const beak = sharedMaterial({ color: 0xd9882b, roughness: 0.7 });
   // Body parts live in their own group so the waddle sway is contained.
   const body = new THREE.Group();
   parent.add(body);
@@ -337,8 +345,8 @@ function buildPenguin(kit: Kit, parent: THREE.Group): Update {
 }
 
 function buildSnowman(kit: Kit, parent: THREE.Group): undefined {
-  const snow = kit.material({ color: 0xf2f4f7, roughness: 0.95 });
-  const carrot = kit.material({ color: 0xd9882b, roughness: 0.7 });
+  const snow = sharedMaterial({ color: 0xf2f4f7, roughness: 0.95 });
+  const carrot = sharedMaterial({ color: 0xd9882b, roughness: 0.7 });
   const radii = [0.42, 0.3, 0.2];
   let y = 0;
   for (const radius of radii) {
@@ -353,8 +361,8 @@ function buildSnowman(kit: Kit, parent: THREE.Group): undefined {
 }
 
 function buildHorse(kit: Kit, parent: THREE.Group): undefined {
-  const coat = kit.material({ color: 0x6b4a2c, roughness: 0.9 });
-  const mane = kit.material({ color: 0x33261a, roughness: 0.95 });
+  const coat = sharedMaterial({ color: 0x6b4a2c, roughness: 0.9 });
+  const mane = sharedMaterial({ color: 0x33261a, roughness: 0.95 });
   kit.box(coat, 0, 1.05, 0, 0.5, 0.5, 1.2, false, parent); // body
   for (const [x, z] of [[-0.17, 0.45], [0.17, 0.45], [-0.17, -0.45], [0.17, -0.45]]) {
     kit.box(coat, x, 0.4, z, 0.13, 0.8, 0.13, false, parent);
@@ -367,7 +375,7 @@ function buildHorse(kit: Kit, parent: THREE.Group): undefined {
 }
 
 function buildSuitedDog(kit: Kit, parent: THREE.Group): undefined {
-  const fur = kit.material({ color: 0xb08d57, roughness: 0.9 });
+  const fur = sharedMaterial({ color: 0xb08d57, roughness: 0.9 });
   // The "suit" is a canvas texture wrapped on the body box.
   const suitBody = canvasPlane(
     kit, parent,
@@ -384,7 +392,7 @@ function buildSuitedDog(kit: Kit, parent: THREE.Group): undefined {
     128, 128, 0.42, 0.4, 0, 0.45, 0.231,
   );
   suitBody.castShadow = true;
-  const suitMaterial = kit.material({ color: 0x2c3e63, roughness: 0.8 });
+  const suitMaterial = sharedMaterial({ color: 0x2c3e63, roughness: 0.8 });
   kit.box(suitMaterial, 0, 0.45, 0, 0.4, 0.4, 0.46, false, parent);
   const headGeometry = kit.track(new THREE.SphereGeometry(0.16, 14, 10));
   kit.mesh(headGeometry, fur, 0, 0.82, 0.12, parent);
@@ -413,7 +421,7 @@ const ANOMALY_BUILDERS: [RegExp, (kit: Kit, parent: THREE.Group, entity: PlacedE
 type ObjectBuilder = (kit: Kit, parent: THREE.Group, entity: PlacedEntity) => Update | undefined;
 
 function woodOf(kit: Kit, entity: PlacedEntity): THREE.Material {
-  return kit.material({
+  return sharedMaterial({
     color: colorFromText(entity.descriptor, entity.id),
     roughness: 0.85,
   });
@@ -421,7 +429,7 @@ function woodOf(kit: Kit, entity: PlacedEntity): THREE.Material {
 
 const buildBench: ObjectBuilder = (kit, parent, entity) => {
   const paint = woodOf(kit, entity);
-  const iron = kit.material({ color: 0x3a3d42, metalness: 0.4, roughness: 0.6 });
+  const iron = sharedMaterial({ color: 0x3a3d42, metalness: 0.4, roughness: 0.6 });
   kit.box(paint, 0, 0.46, 0, 1.7, 0.08, 0.55, false, parent); // seat
   const back = kit.box(paint, 0, 0.78, -0.24, 1.7, 0.5, 0.07, false, parent);
   back.rotation.x = -0.15;
@@ -432,8 +440,8 @@ const buildBench: ObjectBuilder = (kit, parent, entity) => {
 };
 
 const buildFountain: ObjectBuilder = (kit, parent) => {
-  const stone = kit.material({ color: 0x9b948a, roughness: 0.9 });
-  const water = kit.material({ color: 0x5d9bc4, roughness: 0.2, metalness: 0.1 });
+  const stone = sharedMaterial({ color: 0x9b948a, roughness: 0.9 });
+  const water = sharedMaterial({ color: 0x5d9bc4, roughness: 0.2, metalness: 0.1 });
   const basinGeometry = kit.track(new THREE.CylinderGeometry(1.05, 1.15, 0.4, 24));
   kit.mesh(basinGeometry, stone, 0, 0.2, 0, parent);
   const poolGeometry = kit.track(new THREE.CylinderGeometry(0.95, 0.95, 0.06, 24));
@@ -448,8 +456,8 @@ const buildFountain: ObjectBuilder = (kit, parent) => {
 };
 
 const buildTree: ObjectBuilder = (kit, parent) => {
-  const bark = kit.material({ color: 0x5d4023, roughness: 0.95 });
-  const leaves = kit.material({ color: 0x3a6b35, roughness: 0.9 });
+  const bark = sharedMaterial({ color: 0x5d4023, roughness: 0.95 });
+  const leaves = sharedMaterial({ color: 0x3a6b35, roughness: 0.9 });
   const trunkGeometry = kit.track(new THREE.CylinderGeometry(0.18, 0.26, 1.6, 10));
   kit.mesh(trunkGeometry, bark, 0, 0.8, 0, parent);
   const crownGeometry = kit.track(new THREE.SphereGeometry(0.85, 14, 10));
@@ -461,9 +469,9 @@ const buildTree: ObjectBuilder = (kit, parent) => {
 };
 
 const buildCounter: ObjectBuilder = (kit, parent) => {
-  const wood = kit.material({ color: 0x5d4023, roughness: 0.7 });
-  const top = kit.material({ color: 0x3d2a16, roughness: 0.45 });
-  const brass = kit.material({ color: 0xb08d3a, metalness: 0.7, roughness: 0.35 });
+  const wood = sharedMaterial({ color: 0x5d4023, roughness: 0.7 });
+  const top = sharedMaterial({ color: 0x3d2a16, roughness: 0.45 });
+  const brass = sharedMaterial({ color: 0xb08d3a, metalness: 0.7, roughness: 0.35 });
   kit.box(wood, 0, 0.44, 0, 2.8, 0.88, 0.7, false, parent);
   kit.box(top, 0, 0.92, 0, 3.0, 0.06, 0.8, false, parent);
   kit.box(brass, 1.1, 1.07, -0.1, 0.3, 0.24, 0.3, false, parent); // till
@@ -471,8 +479,8 @@ const buildCounter: ObjectBuilder = (kit, parent) => {
 };
 
 const buildMachine: ObjectBuilder = (kit, parent) => {
-  const chrome = kit.material({ color: 0xb9bec7, metalness: 0.85, roughness: 0.25 });
-  const dark = kit.material({ color: 0x2b2e33, roughness: 0.5 });
+  const chrome = sharedMaterial({ color: 0xb9bec7, metalness: 0.85, roughness: 0.25 });
+  const dark = sharedMaterial({ color: 0x2b2e33, roughness: 0.5 });
   kit.box(chrome, 0, 0.24, 0, 0.5, 0.46, 0.38, false, parent);
   kit.box(dark, 0, 0.5, 0, 0.52, 0.07, 0.4, false, parent);
   const spoutGeometry = kit.track(new THREE.CylinderGeometry(0.025, 0.025, 0.12, 8));
@@ -481,12 +489,12 @@ const buildMachine: ObjectBuilder = (kit, parent) => {
 };
 
 const buildDisplayCase: ObjectBuilder = (kit, parent) => {
-  const glass = kit.material({
+  const glass = sharedMaterial({
     color: 0xcfe4ec, roughness: 0.1, metalness: 0.1,
     transparent: true, opacity: 0.35,
   });
-  const base = kit.material({ color: 0x4a3a28, roughness: 0.8 });
-  const pastry = kit.material({ color: 0xc4924a, roughness: 0.8 });
+  const base = sharedMaterial({ color: 0x4a3a28, roughness: 0.8 });
+  const pastry = sharedMaterial({ color: 0xc4924a, roughness: 0.8 });
   kit.box(base, 0, 0.06, 0, 0.7, 0.12, 0.5, false, parent);
   kit.box(glass, 0, 0.36, 0, 0.7, 0.48, 0.5, false, parent);
   const bunGeometry = kit.track(new THREE.SphereGeometry(0.07, 10, 8));
@@ -497,7 +505,7 @@ const buildDisplayCase: ObjectBuilder = (kit, parent) => {
 };
 
 const buildBoard: ObjectBuilder = (kit, parent, entity) => {
-  const frame = kit.material({ color: 0x5d4023, roughness: 0.8 });
+  const frame = sharedMaterial({ color: 0x5d4023, roughness: 0.8 });
   kit.box(frame, 0, 0, 0, 1.5, 0.95, 0.06, false, parent);
   canvasPlane(
     kit, parent,
@@ -547,8 +555,8 @@ const buildTable: ObjectBuilder = (kit, parent, entity) => {
 };
 
 const buildUmbrella = (kit: Kit, parent: THREE.Group, tint: number, scale = 1) => {
-  const pole = kit.material({ color: 0x4a4d52, metalness: 0.3, roughness: 0.6 });
-  const canopy = kit.material({ color: tint, roughness: 0.8 });
+  const pole = sharedMaterial({ color: 0x4a4d52, metalness: 0.3, roughness: 0.6 });
+  const canopy = sharedMaterial({ color: tint, roughness: 0.8 });
   const poleGeometry = kit.track(new THREE.CylinderGeometry(0.02 * scale, 0.02 * scale, 0.9 * scale, 8));
   kit.mesh(poleGeometry, pole, 0, 0.45 * scale, 0, parent);
   const coneGeometry = kit.track(new THREE.ConeGeometry(0.32 * scale, 0.22 * scale, 12));
@@ -556,7 +564,7 @@ const buildUmbrella = (kit: Kit, parent: THREE.Group, tint: number, scale = 1) =
 };
 
 const buildUmbrellaStand: ObjectBuilder = (kit, parent, entity) => {
-  const metal = kit.material({ color: 0x6a6f76, metalness: 0.6, roughness: 0.4 });
+  const metal = sharedMaterial({ color: 0x6a6f76, metalness: 0.6, roughness: 0.4 });
   const bucketGeometry = kit.track(new THREE.CylinderGeometry(0.24, 0.2, 0.5, 14));
   kit.mesh(bucketGeometry, metal, 0, 0.25, 0, parent);
   const lean = new THREE.Group();
@@ -572,11 +580,11 @@ const buildUmbrellaStand: ObjectBuilder = (kit, parent, entity) => {
 };
 
 const buildShelter: ObjectBuilder = (kit, parent) => {
-  const glass = kit.material({
+  const glass = sharedMaterial({
     color: 0xd2e4ec, roughness: 0.08, metalness: 0.1,
     transparent: true, opacity: 0.28,
   });
-  const steel = kit.material({ color: 0x4a4d52, metalness: 0.5, roughness: 0.5 });
+  const steel = sharedMaterial({ color: 0x4a4d52, metalness: 0.5, roughness: 0.5 });
   kit.box(glass, 0, 1.1, -0.55, 2.6, 1.9, 0.05, false, parent); // back panel
   for (const x of [-1.3, 1.3]) {
     kit.box(glass, x, 1.1, 0, 0.05, 1.9, 1.1, false, parent);
@@ -610,7 +618,7 @@ const buildShelter: ObjectBuilder = (kit, parent) => {
 };
 
 const buildSign: ObjectBuilder = (kit, parent, entity) => {
-  const steel = kit.material({ color: 0x4a4d52, metalness: 0.5, roughness: 0.5 });
+  const steel = sharedMaterial({ color: 0x4a4d52, metalness: 0.5, roughness: 0.5 });
   const poleGeometry = kit.track(new THREE.CylinderGeometry(0.035, 0.035, 2.4, 10));
   kit.mesh(poleGeometry, steel, 0, 1.2, 0, parent);
   const routeNumber = /\d+/.exec(entity.descriptor)?.[0] ?? "BUS";
@@ -635,26 +643,26 @@ const buildSign: ObjectBuilder = (kit, parent, entity) => {
 };
 
 const buildBriefcase: ObjectBuilder = (kit, parent) => {
-  const leather = kit.material({ color: 0x5d3a1e, roughness: 0.6 });
+  const leather = sharedMaterial({ color: 0x5d3a1e, roughness: 0.6 });
   const body = kit.box(leather, 0, 0.16, 0, 0.42, 0.3, 0.12, false, parent);
   body.rotation.x = -0.06;
   kit.box(leather, 0, 0.345, 0, 0.14, 0.05, 0.04, false, parent); // handle
-  const cloth = kit.material({ color: 0x6a7076, roughness: 0.95 });
+  const cloth = sharedMaterial({ color: 0x6a7076, roughness: 0.95 });
   const jacket = kit.box(cloth, 0.42, 0.06, 0, 0.34, 0.1, 0.26, false, parent);
   jacket.rotation.y = 0.4;
   return undefined;
 };
 
 const buildCup: ObjectBuilder = (kit, parent) => {
-  const ceramic = kit.material({ color: 0xe8e4d8, roughness: 0.5 });
+  const ceramic = sharedMaterial({ color: 0xe8e4d8, roughness: 0.5 });
   const cupGeometry = kit.track(new THREE.CylinderGeometry(0.06, 0.045, 0.12, 12));
   kit.mesh(cupGeometry, ceramic, 0, 0.06, 0, parent);
   return undefined;
 };
 
 const buildPlant: ObjectBuilder = (kit, parent) => {
-  const clay = kit.material({ color: 0xa05a37, roughness: 0.85 });
-  const leaves = kit.material({ color: 0x3a6b35, roughness: 0.9 });
+  const clay = sharedMaterial({ color: 0xa05a37, roughness: 0.85 });
+  const leaves = sharedMaterial({ color: 0x3a6b35, roughness: 0.9 });
   const potGeometry = kit.track(new THREE.CylinderGeometry(0.16, 0.12, 0.24, 12));
   kit.mesh(potGeometry, clay, 0, 0.12, 0, parent);
   const bushGeometry = kit.track(new THREE.SphereGeometry(0.22, 12, 9));
@@ -663,7 +671,7 @@ const buildPlant: ObjectBuilder = (kit, parent) => {
 };
 
 const buildScreen: ObjectBuilder = (kit, parent) => {
-  const dark = kit.material({ color: 0x1b1e24, roughness: 0.4 });
+  const dark = sharedMaterial({ color: 0x1b1e24, roughness: 0.4 });
   kit.box(dark, 0, 0.85, 0, 1.2, 0.7, 0.06, false, parent);
   kit.box(dark, 0, 0.25, 0, 0.1, 0.5, 0.1, false, parent);
   kit.box(dark, 0, 0.02, 0, 0.5, 0.04, 0.3, false, parent);
@@ -709,7 +717,7 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
 // ---------------------------------------------------------------------------
 
 function buildPlaceholder(kit: Kit, parent: THREE.Group, entity: PlacedEntity): undefined {
-  const tint = kit.material({
+  const tint = sharedMaterial({
     color: colorFromText(entity.descriptor, entity.id),
     roughness: 0.8,
   });
@@ -771,6 +779,18 @@ export function buildSceneMeshes(entities: PlacedEntity[]): BuiltScene {
       }
     }
     if (update) updates.push(update);
+
+    // Ground contact: builders aim feet/bases at y=0, but poses, scales,
+    // and stacked spheres can leave an entity hovering or sunk. Clamp
+    // ground-level entities so their lowest point rests on the floor;
+    // stacked placements ("on the bench", "above the counter") keep the
+    // height the compiler gave them.
+    if (y < 0.05) {
+      const bounds = new THREE.Box3().setFromObject(group);
+      if (!bounds.isEmpty() && Math.abs(bounds.min.y) > 0.02) {
+        group.position.y -= bounds.min.y;
+      }
+    }
 
     // Tag every mesh so raycasts can recover the manifest id later.
     group.traverse((child) => {

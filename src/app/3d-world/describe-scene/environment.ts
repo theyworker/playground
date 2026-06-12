@@ -1,10 +1,15 @@
 import * as THREE from "three";
 import { Kit } from "../pac-meeting/mansion-kit";
+import { sharedMaterial } from "./materials";
 import type { SceneSetting } from "./types";
 
 // Setting-driven stage dressing: lights tuned by time_of_day/weather,
 // rain particles when wet, and an indoor room (floor + walls) versus an
 // open outdoor ground tinted by the location.
+//
+// Intensities assume ACES filmic tone mapping on the renderer (which
+// compresses mids), a hemisphere ambient, and a low-level IBL room
+// environment — see stage-scene.ts.
 
 export interface EnvironmentBuild {
   group: THREE.Group;
@@ -12,8 +17,13 @@ export interface EnvironmentBuild {
     sunColor: number;
     sunIntensity: number;
     sunPosition: [number, number, number];
+    /** Hemisphere sky tint — the soft ambient from above. */
     ambientColor: number;
     ambientIntensity: number;
+    /** Hemisphere ground-bounce tint, from the location's surface. */
+    groundColor: number;
+    /** scene.environmentIntensity for the neutral IBL room. */
+    envIntensity: number;
     background: number;
   };
   update: (elapsed: number) => void;
@@ -34,42 +44,48 @@ function lightsFor(setting: SceneSetting): EnvironmentBuild["lights"] {
   const time = setting.time_of_day.toLowerCase();
   const lights: EnvironmentBuild["lights"] = {
     sunColor: 0xffffff,
-    sunIntensity: 1.4,
+    sunIntensity: 1.8,
     sunPosition: [6, 12, 4],
     ambientColor: 0xcdd6e8,
-    ambientIntensity: 0.5,
+    ambientIntensity: 0.65,
+    groundColor: groundColorFor(setting),
+    envIntensity: 0.5,
     background: 0x9cb8d9,
   };
   if (time.includes("morning")) {
     lights.sunColor = 0xfff3d6;
-    lights.sunIntensity = 1.5;
+    lights.sunIntensity = 1.9;
     lights.ambientColor = 0xbfd4ff;
-    lights.ambientIntensity = 0.55;
+    lights.ambientIntensity = 0.7;
     lights.background = 0x9cc4e4;
   } else if (time.includes("afternoon")) {
     // Late-day golden light, sun low in the west.
     lights.sunColor = 0xffc98a;
-    lights.sunIntensity = 1.25;
+    lights.sunIntensity = 1.6;
     lights.sunPosition = [-8, 6, 5];
     lights.ambientColor = 0xd9c2a6;
-    lights.ambientIntensity = 0.5;
+    lights.ambientIntensity = 0.65;
     lights.background = 0xcfa177;
   } else if (/evening|night|dusk/.test(time)) {
     lights.sunColor = 0x8ca3d9;
-    lights.sunIntensity = 0.55;
+    lights.sunIntensity = 0.7;
     lights.sunPosition = [-4, 8, -3];
     lights.ambientColor = 0x39406b;
-    lights.ambientIntensity = 0.45;
+    lights.ambientIntensity = 0.55;
+    lights.envIntensity = 0.18;
     lights.background = 0x141a2e;
   }
   if (setting.indoor) {
     lights.ambientColor = 0xe8d9c0;
-    lights.ambientIntensity = 0.55;
+    lights.ambientIntensity = 0.7;
+    lights.groundColor = 0x5a4632;
+    lights.envIntensity = 0.45;
     lights.background = 0x262a38;
   }
   if (/rain|storm|drizzle/.test(setting.weather.toLowerCase())) {
     lights.sunIntensity *= 0.45;
-    lights.ambientIntensity *= 0.75;
+    lights.ambientIntensity *= 0.8;
+    lights.envIntensity *= 0.7;
     lights.background = setting.indoor ? 0x2b303b : 0x49505e;
   }
   return lights;
@@ -139,9 +155,9 @@ export function buildEnvironment(setting: SceneSetting): EnvironmentBuild {
   const rainy = /rain|storm|drizzle/.test(setting.weather.toLowerCase());
 
   if (setting.indoor) {
-    const floor = kit.material({ color: 0x6b4a2c, roughness: 0.8 });
-    const wall = kit.material({ color: 0xd9cdb4, roughness: 0.95 });
-    const trim = kit.material({ color: 0x4a3a28, roughness: 0.85 });
+    const floor = sharedMaterial({ color: 0x6b4a2c, roughness: 0.8 });
+    const wall = sharedMaterial({ color: 0xd9cdb4, roughness: 0.95 });
+    const trim = sharedMaterial({ color: 0x4a3a28, roughness: 0.85 });
     const width = ROOM_HALF_X * 2;
     const depth = ROOM_FRONT_Z - ROOM_BACK_Z;
     const centerZ = (ROOM_FRONT_Z + ROOM_BACK_Z) / 2;
@@ -152,7 +168,7 @@ export function buildEnvironment(setting: SceneSetting): EnvironmentBuild {
     }
     kit.box(trim, 0, 0.12, ROOM_BACK_Z + 0.14, width, 0.24, 0.06);
     // Pavement outside the room so rain doesn't fall on the void.
-    const pavement = kit.material({ color: 0x33363d, roughness: 1 });
+    const pavement = sharedMaterial({ color: 0x33363d, roughness: 1 });
     const outsideGeometry = kit.track(
       new THREE.CircleGeometry(15, 48).rotateX(-Math.PI / 2),
     );
@@ -161,7 +177,7 @@ export function buildEnvironment(setting: SceneSetting): EnvironmentBuild {
     outside.receiveShadow = true;
     kit.group.add(outside);
   } else {
-    const ground = kit.material({
+    const ground = sharedMaterial({
       color: groundColorFor(setting),
       roughness: 0.95,
     });
