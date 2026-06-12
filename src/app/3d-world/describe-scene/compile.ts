@@ -41,6 +41,7 @@ const ABOVE_CLEARANCE = 0.7;
  *  The mesh factory builds its primitives to match these. */
 export function surfaceHeightFor(descriptor: string): number {
   const text = descriptor.toLowerCase();
+  if (/blanket|mat\b|rug|towel/.test(text)) return 0.03;
   if (/counter|machine|case|fridge/.test(text)) return 0.95;
   if (/bench|chair|seat|stool/.test(text)) return 0.5;
   if (/table|desk/.test(text)) return 0.74;

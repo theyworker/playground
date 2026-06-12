@@ -698,6 +698,224 @@ const buildPlant: ObjectBuilder = (kit, parent) => {
   return undefined;
 };
 
+const buildBushes: ObjectBuilder = (kit, parent) => {
+  const leafDark = foliageMaterial(0x35602f);
+  const leafLight = foliageMaterial(0x4c7e3e);
+  const blossom = finish.paint(0xd98ca6);
+  const puffGeometry = kit.track(new THREE.SphereGeometry(1, 12, 9));
+  const blossomGeometry = kit.track(new THREE.SphereGeometry(0.035, 8, 6));
+  // Three low mounds of two-tone foliage in a loose row.
+  const mounds: [number, number, number][] = [
+    [-0.85, 0.15, 0.5],
+    [0.05, -0.2, 0.66],
+    [0.9, 0.1, 0.45],
+  ];
+  mounds.forEach(([x, z, s], i) => {
+    const main = kit.mesh(puffGeometry, i % 2 ? leafLight : leafDark, x, s * 0.62, z, parent);
+    main.scale.set(s * 1.2, s * 0.78, s * 1.05);
+    const side = kit.mesh(
+      puffGeometry, i % 2 ? leafDark : leafLight, x + s * 0.7, s * 0.42, z + 0.12, parent,
+    );
+    side.scale.setScalar(s * 0.55);
+  });
+  // A scatter of small pink blossoms resting on the foliage.
+  const spots: [number, number, number][] = [
+    [-1.05, 0.5, 0.75], [-0.6, 0.46, 0.78], [0.0, 0.66, 0.22],
+    [0.3, 0.5, 0.18], [0.85, 0.42, 0.42], [1.15, 0.3, 0.3],
+  ];
+  for (const [x, y, z] of spots) {
+    kit.mesh(blossomGeometry, blossom, x, y, z, parent);
+  }
+  return undefined;
+};
+
+const buildPond: ObjectBuilder = (kit, parent) => {
+  const water = sharedMaterial({ color: 0x6fa6c8, roughness: 0.08, metalness: 0.05 });
+  const bank = finish.stone(0x5a4a36);
+  const stone = finish.stone(0x8d8779);
+  const pad = finish.fabric(0x3f7a44);
+  // Muddy bank ring with the still water sunk just inside it.
+  const bankGeometry = kit.track(
+    new THREE.TorusGeometry(1.28, 0.13, 8, 36).rotateX(Math.PI / 2),
+  );
+  const bankMesh = kit.mesh(bankGeometry, bank, 0, 0.05, 0, parent);
+  bankMesh.scale.set(1.15, 0.45, 1);
+  const waterGeometry = kit.track(
+    new THREE.CircleGeometry(1.27, 36).rotateX(-Math.PI / 2),
+  );
+  const waterMesh = new THREE.Mesh(waterGeometry, water);
+  waterMesh.position.y = 0.045;
+  waterMesh.scale.x = 1.15;
+  waterMesh.receiveShadow = true;
+  parent.add(waterMesh);
+  // A few stones settled along the edge.
+  const stoneGeometry = kit.track(new THREE.SphereGeometry(0.09, 8, 6));
+  const stoneSpots: [number, number, number][] = [
+    [1.32, -0.5, 1.1], [0.6, 1.22, 0.8], [-1.25, 0.62, 1.25], [-0.4, -1.28, 0.9],
+  ];
+  for (const [x, z, s] of stoneSpots) {
+    const rock = kit.mesh(stoneGeometry, stone, x, 0.05, z, parent);
+    rock.scale.set(s, s * 0.6, s * 0.85);
+  }
+  // Lily pads drifting on the surface, one with a white blossom.
+  const padGeometry = kit.track(
+    new THREE.CircleGeometry(1, 14, 0.5, Math.PI * 1.8).rotateX(-Math.PI / 2),
+  );
+  const pads: THREE.Mesh[] = [];
+  const padSpots: [number, number, number][] = [
+    [-0.45, 0.35, 0.15], [0.2, -0.3, 0.11], [0.55, 0.42, 0.13],
+  ];
+  for (const [x, z, s] of padSpots) {
+    const lily = new THREE.Mesh(padGeometry, pad);
+    lily.position.set(x, 0.055, z);
+    lily.scale.setScalar(s);
+    parent.add(lily);
+    pads.push(lily);
+  }
+  const blossomGeometry = kit.track(new THREE.SphereGeometry(0.05, 8, 6));
+  const blossom = kit.mesh(blossomGeometry, finish.paint(0xeeeae0), -0.45, 0.08, 0.35, parent);
+  blossom.scale.y = 0.7;
+  // Reeds with cattail heads swaying at the back edge.
+  const reeds = new THREE.Group();
+  reeds.position.set(-0.85, 0, -1.0);
+  parent.add(reeds);
+  const stemGeometry = kit.track(new THREE.CylinderGeometry(0.012, 0.016, 1, 6));
+  const tailGeometry = kit.track(new THREE.CapsuleGeometry(0.03, 0.1, 4, 8));
+  const tail = finish.fabric(0x5d4023);
+  const stems: [number, number, number][] = [
+    [0, 0, 0.62], [0.16, 0.08, 0.5], [-0.14, -0.06, 0.55],
+  ];
+  for (const [x, z, h] of stems) {
+    const stem = kit.mesh(stemGeometry, pad, x, h / 2, z, reeds);
+    stem.scale.y = h;
+    kit.mesh(tailGeometry, tail, x, h + 0.05, z, reeds);
+  }
+  return (t) => {
+    reeds.rotation.z = Math.sin(t * 1.1) * 0.05;
+    pads.forEach((lily, i) => {
+      lily.position.y = 0.055 + Math.sin(t * 0.6 + i * 2) * 0.004;
+    });
+  };
+};
+
+const buildPicnicMat: ObjectBuilder = (kit, parent, entity) => {
+  const tint = colorFromText(entity.descriptor, entity.id);
+  const base = new THREE.Color(tint);
+  const r = Math.round(base.r * 255);
+  const g = Math.round(base.g * 255);
+  const b = Math.round(base.b * 255);
+  // Gingham check drawn over a cream ground.
+  const plaid = surfaceMaterial(
+    `plaid:${tint}`, 256, 256,
+    (ctx, w, h) => {
+      ctx.fillStyle = "#f5efe0";
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = `rgba(${r},${g},${b},0.45)`;
+      for (let x = 0; x < w; x += 64) ctx.fillRect(x, 0, 28, h);
+      for (let y = 0; y < h; y += 64) ctx.fillRect(0, y, w, 28);
+      ctx.fillStyle = `rgba(${r},${g},${b},0.85)`;
+      for (let x = 46; x < w; x += 64) ctx.fillRect(x, 0, 5, h);
+      for (let y = 46; y < h; y += 64) ctx.fillRect(0, y, w, 5);
+    },
+    { roughness: 0.95 },
+  );
+  const blanket = rbox(kit, plaid, 0, 0.013, 0, 1.6, 0.026, 1.25, parent, 0.01);
+  blanket.rotation.y = 0.16; // thrown down casually, not squared to the stage
+  return undefined;
+};
+
+const buildBasket: ObjectBuilder = (kit, parent) => {
+  // Woven wicker: staggered horizontal strands over vertical ribs.
+  const wicker = surfaceMaterial(
+    "wicker", 128, 128,
+    (ctx, w, h) => {
+      ctx.fillStyle = "#ad8a52";
+      ctx.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 14) {
+        const offset = ((y / 14) % 2) * 11;
+        ctx.fillStyle = "rgba(255,235,200,0.35)";
+        for (let x = -11; x < w; x += 22) {
+          ctx.fillRect(x + offset, y + 2, 16, 9);
+        }
+        ctx.fillStyle = "rgba(60,40,20,0.3)";
+        ctx.fillRect(0, y, w, 2);
+      }
+      ctx.fillStyle = "rgba(60,40,20,0.25)";
+      for (let x = 0; x < w; x += 22) ctx.fillRect(x, 0, 3, h);
+    },
+    { roughness: 0.85 },
+  );
+  const wood = finish.wood(0x8a6a3e);
+  rbox(kit, wicker, 0, 0.13, 0, 0.42, 0.26, 0.3, parent, 0.025);
+  rbox(kit, wood, 0, 0.27, 0, 0.46, 0.035, 0.34, parent, 0.012); // rim
+  const handleGeometry = kit.track(new THREE.TorusGeometry(0.15, 0.016, 8, 18, Math.PI));
+  kit.mesh(handleGeometry, wood, 0, 0.28, 0, parent);
+  // Lid flap resting half-open over the back, baguette out the front.
+  const flap = rbox(kit, wood, 0, 0.3, -0.09, 0.4, 0.014, 0.16, parent, 0.006);
+  flap.rotation.x = -0.18;
+  const baguetteGeometry = kit.track(new THREE.CapsuleGeometry(0.045, 0.18, 4, 8));
+  const baguette = kit.mesh(baguetteGeometry, finish.fabric(0xcf9f5a), 0.09, 0.34, 0.07, parent);
+  baguette.rotation.set(-0.35, 0, 0.4);
+  // An apple set out on the blanket beside the basket.
+  const appleGeometry = kit.track(new THREE.SphereGeometry(0.05, 10, 8));
+  kit.mesh(appleGeometry, finish.paint(0x9a3a32), 0.32, 0.05, 0.14, parent);
+  return undefined;
+};
+
+const buildDog: ObjectBuilder = (kit, parent) => {
+  const coat = finish.fabric(0xb08d57);
+  const coatLight = finish.fabric(0xd2b88a);
+  const dark = finish.plastic(0x2b2e33);
+  const collar = finish.paint(0xb33a3a);
+  // Angled off-axis so it reads as wandering, not posed.
+  const dog = new THREE.Group();
+  dog.rotation.y = -0.55;
+  parent.add(dog);
+  const bodyGeometry = kit.track(
+    new THREE.CapsuleGeometry(0.155, 0.3, 4, 12).rotateX(Math.PI / 2),
+  );
+  kit.mesh(bodyGeometry, coat, 0, 0.4, 0, dog);
+  const chestGeometry = kit.track(new THREE.SphereGeometry(0.13, 10, 8));
+  kit.mesh(chestGeometry, coatLight, 0, 0.36, 0.2, dog);
+  // Head dipped toward the grass, mid-sniff.
+  const head = new THREE.Group();
+  head.position.set(0, 0.52, 0.32);
+  head.rotation.x = 0.5;
+  dog.add(head);
+  const skullGeometry = kit.track(new THREE.SphereGeometry(0.115, 12, 9));
+  kit.mesh(skullGeometry, coat, 0, 0, 0.02, head);
+  const snoutGeometry = kit.track(
+    new THREE.CapsuleGeometry(0.045, 0.07, 4, 8).rotateX(Math.PI / 2),
+  );
+  kit.mesh(snoutGeometry, coatLight, 0, -0.035, 0.13, head);
+  const noseGeometry = kit.track(new THREE.SphereGeometry(0.022, 8, 6));
+  kit.mesh(noseGeometry, dark, 0, -0.035, 0.19, head);
+  for (const side of [-1, 1]) {
+    const ear = kit.box(coat, side * 0.1, 0.04, -0.02, 0.045, 0.13, 0.08, false, head);
+    ear.rotation.z = side * 0.3; // floppy
+  }
+  const collarGeometry = kit.track(
+    new THREE.TorusGeometry(0.095, 0.018, 6, 16).rotateX(Math.PI / 2),
+  );
+  const band = kit.mesh(collarGeometry, collar, 0, 0.47, 0.25, dog);
+  band.rotation.x = 0.4;
+  const legGeometry = kit.track(new THREE.CylinderGeometry(0.032, 0.028, 0.28, 8));
+  for (const [x, z] of [[-0.08, 0.16], [0.08, 0.16], [-0.08, -0.16], [0.08, -0.16]]) {
+    kit.mesh(legGeometry, coat, x, 0.14, z, dog);
+  }
+  // Tail up and wagging.
+  const tailPivot = new THREE.Group();
+  tailPivot.position.set(0, 0.48, -0.27);
+  tailPivot.rotation.x = -0.8;
+  dog.add(tailPivot);
+  const tailGeometry = kit.track(new THREE.CapsuleGeometry(0.024, 0.14, 4, 8));
+  kit.mesh(tailGeometry, coat, 0, 0.09, 0, tailPivot);
+  return (t) => {
+    tailPivot.rotation.z = Math.sin(t * 7) * 0.35;
+    head.rotation.x = 0.5 + Math.sin(t * 0.9) * 0.15; // sniffing bob
+  };
+};
+
 const buildScreen: ObjectBuilder = (kit, parent) => {
   const dark = finish.plastic(0x1b1e24);
   const panel = finish.ceramic(0x2e3440);
@@ -735,6 +953,11 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/chair|stool/, buildChair],
   [/lamp/, buildLamp],
   [/table|desk/, buildTable],
+  [/pond|lake/, buildPond],
+  [/bush|shrub|hedge/, buildBushes],
+  [/blanket|picnic mat|\brug\b/, buildPicnicMat],
+  [/basket|hamper/, buildBasket],
+  [/\bdog\b|puppy/, buildDog],
   [/briefcase|suitcase/, buildBriefcase],
   [/cup|mug|latte/, buildCup],
   [/plant|pot\b/, buildPlant],
@@ -824,9 +1047,9 @@ export function buildSceneMeshes(entities: PlacedEntity[]): BuiltScene {
     // Ground contact: builders aim feet/bases at y=0, but poses, scales,
     // and stacked spheres can leave an entity hovering or sunk. Clamp
     // ground-level entities so their lowest point rests on the floor;
-    // stacked placements ("on the bench", "above the counter") keep the
-    // height the compiler gave them.
-    if (y < 0.05) {
+    // stacked placements ("on the blanket", "above the counter") keep
+    // the height the compiler gave them.
+    if (y < 0.02) {
       const bounds = new THREE.Box3().setFromObject(group);
       if (!bounds.isEmpty() && Math.abs(bounds.min.y) > 0.02) {
         group.position.y -= bounds.min.y;
@@ -834,8 +1057,13 @@ export function buildSceneMeshes(entities: PlacedEntity[]): BuiltScene {
     }
 
     // Soft contact blob under props and creatures (people get real shadow
-    // detail from their many parts; wall-mounted boards float on purpose).
-    if (entity.kind !== "person" && entity.transform.position[1] < 1) {
+    // detail from their many parts; wall-mounted boards float on purpose,
+    // and water features sit in the ground rather than on it).
+    if (
+      entity.kind !== "person" &&
+      entity.transform.position[1] < 1 &&
+      !/pond|lake|pool|puddle/.test(entity.descriptor.toLowerCase())
+    ) {
       const bounds = new THREE.Box3().setFromObject(group);
       const size = bounds.getSize(new THREE.Vector3());
       contactShadow(
