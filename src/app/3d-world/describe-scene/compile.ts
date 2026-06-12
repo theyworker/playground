@@ -24,8 +24,14 @@ export interface PlacedEntity {
 }
 
 // Stage coordinate grid. The camera sits on +z looking toward -z, so
-// foreground is +z and rotationY 0 faces the camera.
-export const DEPTH = { foreground: 4, midground: 0, background: -5 } as const;
+// foreground is +z and rotationY 0 faces the camera. farBackground sits
+// inside the fog band so distant scenery visibly recedes.
+export const DEPTH = {
+  foreground: 4,
+  midground: 0,
+  background: -5,
+  farBackground: -9,
+} as const;
 export const LATERAL = { left: -3.2, center: 0, right: 3.2 } as const;
 
 const ABSOLUTE_JITTER = 0.4;
@@ -112,10 +118,16 @@ export function parsePosition(position: string): {
   const text = position.toLowerCase();
   let depth: number = DEPTH.midground;
   if (text.includes("foreground")) depth = DEPTH.foreground;
-  else if (text.includes("background")) depth = DEPTH.background;
+  else if (/far background|in the distance|far away|horizon/.test(text)) {
+    depth = DEPTH.farBackground;
+  } else if (text.includes("background")) depth = DEPTH.background;
   let lateral: number = LATERAL.center;
   if (text.includes("left")) lateral = LATERAL.left;
   else if (text.includes("right")) lateral = LATERAL.right;
+  // The frustum widens with distance: spread far-background slots so
+  // distant scenery clears the regular background row instead of
+  // stacking behind it.
+  if (depth === DEPTH.farBackground) lateral *= 1.6;
   return { depth, lateral };
 }
 
