@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { Kit } from "../pac-meeting/mansion-kit";
-import { hash01 } from "./compile";
 import { sharedMaterial } from "./materials";
+import { colorFromText } from "./palette";
+import { buildPerson } from "./person";
+import type { Update } from "./person";
 import type { PlacedEntity } from "./compile";
 
 // Procedural mesh factory: turns compiled PlacedEntity records into
@@ -20,38 +22,6 @@ export interface BuiltScene {
   dispose: () => void;
   /** Descriptors that rendered as the placeholder fallback (asset gaps). */
   fallbacks: string[];
-}
-
-type Update = (elapsed: number) => void;
-
-const SKIN = 0xe3a983;
-
-const COLOR_WORDS: [RegExp, number][] = [
-  [/\bnavy\b/, 0x2c3e63],
-  [/\bblue\b/, 0x3b6ea5],
-  [/\borange\b/, 0xd97a2b],
-  [/\bred\b/, 0xb33a3a],
-  [/\bgreen\b/, 0x3f7a44],
-  [/\byellow\b/, 0xd9b832],
-  [/\bbeige\b|\btan\b/, 0xcbb594],
-  [/\bgrey\b|\bgray\b/, 0x8a8d93],
-  [/\bblack\b/, 0x2b2e33],
-  [/\bwhite\b/, 0xe8e8e4],
-  [/\bbrown\b|\bleather\b|\bwood(en)?\b/, 0x6b4a2c],
-  [/\bpink\b/, 0xd98ca6],
-  [/\bpurple\b/, 0x7a5ba6],
-];
-
-// Color words in the descriptor win; otherwise a deterministic id-seeded
-// tint so figures differ without randomness.
-function colorFromText(text: string, seed: string): number {
-  const lower = text.toLowerCase();
-  for (const [pattern, color] of COLOR_WORDS) {
-    if (pattern.test(lower)) return color;
-  }
-  return new THREE.Color()
-    .setHSL(hash01(`${seed}:hue`), 0.4, 0.5)
-    .getHex();
 }
 
 // Kit.canvasPlane always parents into kit.group; entities need planes
@@ -87,217 +57,6 @@ function canvasPlane(
 }
 
 // ---------------------------------------------------------------------------
-// People: capsule body + sphere head, posed from the manifest action.
-// ---------------------------------------------------------------------------
-
-interface PersonRig {
-  pose: THREE.Group; // origin at the feet; poses lean/shift this
-  head: THREE.Mesh;
-  leftArm: THREE.Group; // pivot at shoulder
-  rightArm: THREE.Group;
-  leftLeg: THREE.Group; // pivot at hip
-  rightLeg: THREE.Group;
-  bodyMaterial: THREE.Material;
-  phase: number;
-}
-
-function buildPersonRig(
-  kit: Kit,
-  parent: THREE.Group,
-  tint: number,
-  id: string,
-): PersonRig {
-  const pose = new THREE.Group();
-  parent.add(pose);
-
-  const bodyMaterial = sharedMaterial({ color: tint, roughness: 0.8 });
-  const skinMaterial = sharedMaterial({ color: SKIN, roughness: 0.7 });
-
-  const torsoGeometry = kit.track(new THREE.CapsuleGeometry(0.22, 0.45, 4, 12));
-  kit.mesh(torsoGeometry, bodyMaterial, 0, 1.15, 0, pose);
-
-  const headGeometry = kit.track(new THREE.SphereGeometry(0.16, 16, 12));
-  const head = kit.mesh(headGeometry, skinMaterial, 0, 1.72, 0, pose);
-
-  const armGeometry = kit.track(new THREE.CapsuleGeometry(0.065, 0.42, 4, 8));
-  const legGeometry = kit.track(new THREE.CapsuleGeometry(0.085, 0.6, 4, 8));
-
-  const limb = (
-    geometry: THREE.BufferGeometry,
-    x: number,
-    y: number,
-    drop: number,
-  ): THREE.Group => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, y, 0);
-    pose.add(pivot);
-    kit.mesh(geometry, bodyMaterial, 0, -drop, 0, pivot);
-    return pivot;
-  };
-
-  return {
-    pose,
-    head,
-    leftArm: limb(armGeometry, -0.29, 1.45, 0.28),
-    rightArm: limb(armGeometry, 0.29, 1.45, 0.28),
-    leftLeg: limb(legGeometry, -0.11, 0.85, 0.42),
-    rightLeg: limb(legGeometry, 0.11, 0.85, 0.42),
-    bodyMaterial,
-    phase: hash01(`${id}:phase`) * Math.PI * 2,
-  };
-}
-
-type PoseName =
-  | "idle" | "run" | "sit" | "read" | "drink"
-  | "type" | "reach" | "wave" | "check" | "photo";
-
-// Ordered: first match wins, so "typing while sipping" types rather than
-// drinks.
-const ACTION_POSES: [RegExp, PoseName][] = [
-  [/photo|photograph|filming/, "photo"],
-  [/wav(e|ing)/, "wave"],
-  [/typing|laptop|working on/, "type"],
-  [/read/, "read"],
-  [/drink|sipping|\bsip\b/, "drink"],
-  [/jog|runn?ing|sprint/, "run"],
-  [/checking|glanc/, "check"],
-  [/wip(e|ing)|steam|operat|clean|serv|pour/, "reach"],
-  [/sitting|seated|kneel/, "sit"],
-];
-
-function poseFor(action: string | undefined): PoseName {
-  const text = (action ?? "").toLowerCase();
-  for (const [pattern, pose] of ACTION_POSES) {
-    if (pattern.test(text)) return pose;
-  }
-  return "idle";
-}
-
-// Folds the rig into a seated layout (hips at the pose origin). Used by
-// "sit" and "type"; adds a procedural seat when nothing was placed under.
-function foldSeated(kit: Kit, rig: PersonRig, parent: THREE.Group, anchored: boolean) {
-  rig.pose.position.y = -0.82;
-  rig.leftLeg.rotation.x = -1.35;
-  rig.rightLeg.rotation.x = -1.35;
-  if (!anchored) {
-    rig.pose.position.y += 0.5;
-    const seatMaterial = sharedMaterial({ color: 0x4a3a28, roughness: 0.9 });
-    kit.box(seatMaterial, 0, 0.24, -0.05, 0.5, 0.48, 0.5, false, parent);
-  }
-}
-
-function buildPersonPose(
-  kit: Kit,
-  rig: PersonRig,
-  pose: PoseName,
-  seated: boolean,
-): Update | undefined {
-  const propMaterial = sharedMaterial({ color: 0xd9d2c0, roughness: 0.85 });
-  const darkProp = sharedMaterial({ color: 0x33363d, roughness: 0.6 });
-
-  switch (pose) {
-    case "run": {
-      if (seated) return undefined; // can't jog while folded onto a seat
-      rig.pose.rotation.x = 0.28;
-      return (t) => {
-        const swing = Math.sin(t * 7 + rig.phase);
-        rig.leftLeg.rotation.x = swing * 0.75;
-        rig.rightLeg.rotation.x = -swing * 0.75;
-        rig.leftArm.rotation.x = -swing * 0.65;
-        rig.rightArm.rotation.x = swing * 0.65;
-        rig.pose.position.y = Math.abs(Math.sin(t * 7 + rig.phase)) * 0.06;
-      };
-    }
-    case "sit":
-      rig.leftArm.rotation.x = -0.4;
-      rig.rightArm.rotation.x = -0.4;
-      return undefined;
-    case "read": {
-      rig.leftArm.rotation.x = -1.1;
-      rig.rightArm.rotation.x = -1.1;
-      rig.head.rotation.x = 0.3;
-      // The "book": two thin angled boxes held at chest height.
-      const page = (side: number) => {
-        const mesh = kit.box(propMaterial, side * 0.09, 1.18, 0.33, 0.18, 0.24, 0.02, false, rig.pose);
-        mesh.rotation.y = -side * 0.4;
-      };
-      page(-1);
-      page(1);
-      return undefined;
-    }
-    case "drink": {
-      rig.rightArm.rotation.x = -2.3;
-      const cupGeometry = kit.track(new THREE.CylinderGeometry(0.05, 0.04, 0.12, 10));
-      kit.mesh(cupGeometry, propMaterial, 0.18, 1.58, 0.16, rig.pose);
-      return (t) => {
-        rig.head.rotation.x = -0.1 + Math.sin(t * 0.8 + rig.phase) * 0.05;
-      };
-    }
-    case "type": {
-      rig.leftArm.rotation.x = -1.0;
-      rig.rightArm.rotation.x = -1.0;
-      rig.head.rotation.x = 0.35;
-      // Laptop: base + tilted screen in front of the lap.
-      kit.box(darkProp, 0, 0.62, 0.32, 0.34, 0.02, 0.24, false, rig.pose);
-      const screen = kit.box(darkProp, 0, 0.76, 0.42, 0.34, 0.26, 0.015, false, rig.pose);
-      screen.rotation.x = -0.25;
-      return (t) => {
-        const tap = Math.sin(t * 9 + rig.phase) * 0.06;
-        rig.leftArm.rotation.x = -1.0 + tap;
-        rig.rightArm.rotation.x = -1.0 - tap;
-      };
-    }
-    case "reach": {
-      if (!seated) rig.pose.rotation.x = 0.22;
-      rig.leftArm.rotation.x = -1.25;
-      rig.rightArm.rotation.x = -1.25;
-      return (t) => {
-        rig.rightArm.rotation.z = Math.sin(t * 3 + rig.phase) * 0.15;
-      };
-    }
-    case "wave": {
-      rig.rightArm.rotation.z = 2.6;
-      return (t) => {
-        rig.rightArm.rotation.z = 2.6 + Math.sin(t * 6 + rig.phase) * 0.25;
-      };
-    }
-    case "check": {
-      rig.rightArm.rotation.x = -1.9;
-      rig.head.rotation.x = 0.35;
-      kit.box(darkProp, 0.2, 1.5, 0.22, 0.08, 0.14, 0.015, false, rig.pose);
-      return undefined;
-    }
-    case "photo": {
-      rig.leftArm.rotation.x = -1.7;
-      rig.rightArm.rotation.x = -1.7;
-      kit.box(darkProp, 0, 1.62, 0.3, 0.16, 0.1, 0.03, false, rig.pose);
-      return undefined;
-    }
-    case "idle":
-      return (t) => {
-        rig.pose.rotation.z = Math.sin(t * 1.2 + rig.phase) * 0.02;
-      };
-  }
-}
-
-function buildPerson(
-  kit: Kit,
-  parent: THREE.Group,
-  entity: PlacedEntity,
-  tintOverride?: number,
-): Update | undefined {
-  const tint = tintOverride ?? colorFromText(entity.descriptor, entity.id);
-  const rig = buildPersonRig(kit, parent, tint, entity.id);
-  const pose = poseFor(entity.action);
-  // Anyone placed "on" a surface (bench, chair) sits regardless of what
-  // their hands are doing; sit/type imply sitting even on open ground.
-  const anchored = entity.transform.position[1] > 0.1;
-  const seated = anchored || pose === "sit" || pose === "type";
-  if (seated) foldSeated(kit, rig, parent, anchored);
-  return buildPersonPose(kit, rig, pose, seated);
-}
-
-// ---------------------------------------------------------------------------
 // Anomalies: still pure primitives; scale conveys "giant/tiny" oddities.
 // ---------------------------------------------------------------------------
 
@@ -309,18 +68,18 @@ function anomalyScale(descriptor: string): number {
 }
 
 function buildScubaDiver(kit: Kit, parent: THREE.Group, entity: PlacedEntity): Update | undefined {
-  const update = buildPerson(kit, parent, entity, 0x23282f);
+  const { rig, update } = buildPerson(kit, parent, entity, 0x23282f);
   const gearMaterial = sharedMaterial({ color: 0x8a929c, metalness: 0.5, roughness: 0.4 });
   const rubberMaterial = sharedMaterial({ color: 0x1b1e24, roughness: 0.9 });
-  // Tank on the back.
+  // Gear rides the rig parts so it follows pose, scale, and motion.
   const tankGeometry = kit.track(new THREE.CylinderGeometry(0.12, 0.12, 0.55, 12));
-  kit.mesh(tankGeometry, gearMaterial, 0, 1.2, -0.28, parent);
-  // Mask: a ring across the face.
-  const maskGeometry = kit.track(new THREE.TorusGeometry(0.1, 0.025, 8, 16));
-  kit.mesh(maskGeometry, gearMaterial, 0, 1.74, 0.13, parent);
-  // Flippers: flat boxes pointing forward from the feet.
-  kit.box(rubberMaterial, -0.11, 0.02, 0.18, 0.14, 0.04, 0.42, false, parent);
-  kit.box(rubberMaterial, 0.11, 0.02, 0.18, 0.14, 0.04, 0.42, false, parent);
+  kit.mesh(tankGeometry, gearMaterial, 0, 0.32, -0.22, rig.torso); // tank on the back
+  const maskGeometry = kit.track(new THREE.TorusGeometry(0.09, 0.025, 8, 16));
+  kit.mesh(maskGeometry, gearMaterial, 0, 0.13, 0.1, rig.head); // mask across the face
+  // Flippers: flat blades pointing forward from each foot.
+  for (const leg of [rig.leftLeg, rig.rightLeg]) {
+    kit.box(rubberMaterial, 0, -0.45, 0.22, 0.14, 0.035, 0.4, false, leg.joint);
+  }
   return update;
 }
 
@@ -767,7 +526,7 @@ export function buildSceneMeshes(entities: PlacedEntity[]): BuiltScene {
       }
       group.scale.setScalar(anomalyScale(entity.descriptor));
     } else if (entity.kind === "person") {
-      update = buildPerson(kit, group, entity);
+      update = buildPerson(kit, group, entity).update;
     } else {
       const text = entity.descriptor.toLowerCase();
       const builder = OBJECT_BUILDERS.find(([pattern]) => pattern.test(text));
