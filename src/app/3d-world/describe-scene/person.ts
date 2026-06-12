@@ -85,8 +85,11 @@ function geometryFor(kit: Kit): PersonGeometry {
       hand: kit.track(new THREE.SphereGeometry(0.05, 10, 8)),
       thigh: kit.track(new THREE.CapsuleGeometry(0.07, 0.28, 4, 10)),
       shin: kit.track(new THREE.CapsuleGeometry(0.055, 0.26, 4, 10)),
+      // Shallow dome: the face texture draws brows at ~0.36PI from the top
+      // pole, so the cap stops at 0.34PI and the back-tilt below keeps the
+      // front rim above the forehead while dipping toward the nape.
       hairCap: kit.track(
-        new THREE.SphereGeometry(0.127, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.58),
+        new THREE.SphereGeometry(0.127, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.34),
       ),
       hairFall: kit.track(new THREE.SphereGeometry(0.1, 12, 10)),
     };
@@ -128,12 +131,13 @@ function buildHair(
     ? 0x9b9b98
     : pick(HAIR_PALETTE, `${entity.id}:hair`);
   const hair = sharedMaterial({ color: tint, roughness: 0.95 });
-  // The cap matches the skull's 1.15 y-stretch and tilts back so the rim
-  // sits above the brows in front and drops toward the nape behind.
-  const cap = kit.mesh(geometry.hairCap, hair, 0, 0.115, -0.008, head);
+  // The cap matches the skull's 1.15 y-stretch; only the crown is covered,
+  // tilted back so the front rim stays clear above the brows and the back
+  // rim drops toward the nape.
+  const cap = kit.mesh(geometry.hairCap, hair, 0, 0.115, -0.01, head);
   cap.name = "hairCap";
   cap.scale.set(1.02, 1.15, 1.04);
-  cap.rotation.x = -0.22;
+  cap.rotation.x = -0.35;
   if (genderFor(entity.descriptor, entity.id) === "female") {
     // Long fall down the back of the head to the shoulders.
     const fall = kit.mesh(geometry.hairFall, hair, 0, 0, -0.075, head);
