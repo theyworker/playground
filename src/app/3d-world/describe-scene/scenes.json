@@ -42,18 +42,78 @@
         "name": "large oak tree",
         "position": "background left",
         "detail": "thick trunk casting a long morning shadow"
+      },
+      {
+        "id": "o_pond",
+        "name": "small pond",
+        "position": "far background, left",
+        "detail": "still water with lily pads, glinting in the distance"
+      },
+      {
+        "id": "o_bushes",
+        "name": "flowering bushes",
+        "position": "background centre",
+        "detail": "a few low green bushes dotted with small pink blossoms"
+      },
+      {
+        "id": "o_picnic_mat",
+        "name": "picnic blanket",
+        "position": "foreground right",
+        "detail": "red and white checked blanket spread on the grass"
+      },
+      {
+        "id": "o_basket",
+        "name": "picnic basket",
+        "position": "on the picnic blanket",
+        "detail": "wicker basket with a baguette poking out"
+      },
+      {
+        "id": "o_dog",
+        "name": "small dog",
+        "position": "next to the picnic blanket",
+        "detail": "tan dog with a red collar sniffing the grass"
       }
     ],
     "spatial_relationships": [
-      { "subject": "p_old_man", "relation": "is sitting on", "target": "o_bench" },
-      { "subject": "o_bench", "relation": "is under", "target": "o_oak_tree" },
-      { "subject": "p_jogger", "relation": "is running past", "target": "o_fountain" }
+      {
+        "subject": "p_old_man",
+        "relation": "is sitting on",
+        "target": "o_bench"
+      },
+      {
+        "subject": "o_bench",
+        "relation": "is under",
+        "target": "o_oak_tree"
+      },
+      {
+        "subject": "p_jogger",
+        "relation": "is running past",
+        "target": "o_fountain"
+      },
+      {
+        "subject": "o_basket",
+        "relation": "is on",
+        "target": "o_picnic_mat"
+      },
+      {
+        "subject": "o_dog",
+        "relation": "is next to",
+        "target": "o_picnic_mat"
+      },
+      {
+        "subject": "o_pond",
+        "relation": "is far behind",
+        "target": "o_bench"
+      }
     ],
     "anomaly": null,
     "elements": {
-      "counts": { "people": 2, "objects": 3 }
+      "counts": {
+        "people": 2,
+        "objects": 8
+      }
     },
-    "model_answer": "This picture shows a quiet park on a sunny morning. In the foreground on the left, an elderly man wearing a grey cardigan and a flat cap is sitting on a green wooden bench, reading his newspaper. The bench sits in the shade of a large oak tree behind him. In the centre of the park there is a round stone fountain with a small jet of water. In the background on the right, a young woman in a bright orange running jacket is jogging along the path, just passing the fountain. Overall, it looks like a calm and peaceful start to the day."
+    "model_answer": "This picture shows a quiet park on a sunny morning. In the foreground on the left, an elderly man wearing a grey cardigan and a flat cap is sitting on a green wooden bench, reading his newspaper. The bench sits in the shade of a large oak tree behind him. In the centre of the park there is a round stone fountain with a small jet of water. On the right in the foreground, a red and white checked picnic blanket is spread on the grass with a wicker basket on it, and a small tan dog with a red collar is sniffing around next to it. Far away on the left, beyond the oak tree, a small pond glints in the morning light, and a few flowering bushes grow across the back of the lawn. In the background on the right, a young woman in a bright orange running jacket is jogging along the path, just passing the fountain. Overall, it looks like a calm and peaceful start to the day."
   },
   {
     "id": "cafe-rush",
@@ -137,17 +197,48 @@
       }
     ],
     "spatial_relationships": [
-      { "subject": "p_barista", "relation": "is standing behind", "target": "o_counter" },
-      { "subject": "p_barista", "relation": "is operating", "target": "o_espresso_machine" },
-      { "subject": "o_menu_board", "relation": "is hanging above", "target": "o_counter" },
-      { "subject": "o_pastry_case", "relation": "is at the right end of", "target": "o_counter" },
-      { "subject": "p_businessman", "relation": "is queuing in front of", "target": "o_pastry_case" },
-      { "subject": "p_student", "relation": "is sitting at", "target": "o_window_table" },
-      { "subject": "p_child", "relation": "is sitting next to", "target": "p_mother" }
+      {
+        "subject": "p_barista",
+        "relation": "is standing behind",
+        "target": "o_counter"
+      },
+      {
+        "subject": "p_barista",
+        "relation": "is operating",
+        "target": "o_espresso_machine"
+      },
+      {
+        "subject": "o_menu_board",
+        "relation": "is hanging above",
+        "target": "o_counter"
+      },
+      {
+        "subject": "o_pastry_case",
+        "relation": "is at the right end of",
+        "target": "o_counter"
+      },
+      {
+        "subject": "p_businessman",
+        "relation": "is queuing in front of",
+        "target": "o_pastry_case"
+      },
+      {
+        "subject": "p_student",
+        "relation": "is sitting at",
+        "target": "o_window_table"
+      },
+      {
+        "subject": "p_child",
+        "relation": "is sitting next to",
+        "target": "p_mother"
+      }
     ],
     "anomaly": null,
     "elements": {
-      "counts": { "people": 5, "objects": 6 }
+      "counts": {
+        "people": 5,
+        "objects": 6
+      }
     },
     "model_answer": "This is a busy corner café on a rainy morning. Behind the counter at the back, a barista in a black apron is steaming milk at a chrome espresso machine, and a chalkboard menu hangs above her. At the right end of the counter there is a glass pastry case full of croissants, and a man in a navy suit is waiting in front of it, checking his phone while holding a wet umbrella. In the foreground on the right, a student wearing headphones is typing on a laptop at a small window table; you can see rain streaking the glass behind him. In the back left corner, a mother in a yellow raincoat is wiping the table while her little boy kneels on his chair and waves at the door. Next to the entrance, a metal umbrella stand is already crowded with dripping umbrellas, so it is clearly a wet and hectic start to the day."
   },
@@ -209,11 +300,31 @@
       }
     ],
     "spatial_relationships": [
-      { "subject": "p_commuter", "relation": "is standing in front of", "target": "p_diver" },
-      { "subject": "p_teenager", "relation": "is standing behind", "target": "p_diver" },
-      { "subject": "o_briefcase", "relation": "is sitting on", "target": "o_bench" },
-      { "subject": "o_bench", "relation": "is inside", "target": "o_bus_shelter" },
-      { "subject": "o_stop_sign", "relation": "is to the left of", "target": "o_bus_shelter" }
+      {
+        "subject": "p_commuter",
+        "relation": "is standing in front of",
+        "target": "p_diver"
+      },
+      {
+        "subject": "p_teenager",
+        "relation": "is standing behind",
+        "target": "p_diver"
+      },
+      {
+        "subject": "o_briefcase",
+        "relation": "is sitting on",
+        "target": "o_bench"
+      },
+      {
+        "subject": "o_bench",
+        "relation": "is inside",
+        "target": "o_bus_shelter"
+      },
+      {
+        "subject": "o_stop_sign",
+        "relation": "is to the left of",
+        "target": "o_bus_shelter"
+      }
     ],
     "anomaly": {
       "id": "p_diver",
@@ -222,7 +333,10 @@
       "position": "middle of the queue, foreground centre"
     },
     "elements": {
-      "counts": { "people": 3, "objects": 4 }
+      "counts": {
+        "people": 3,
+        "objects": 4
+      }
     },
     "model_answer": "This picture shows an ordinary city bus stop on a clear afternoon, but something very strange is happening. In the middle of the queue, a man is waiting for the bus dressed in a full scuba wetsuit, with a diving mask on his face and flippers on his feet, calmly holding a transit pass. This is bizarre because there is no water anywhere nearby — scuba gear belongs in the ocean, and it would be almost impossible to climb onto a bus wearing flippers. The people around him have clearly noticed: the woman in a trench coat at the front of the queue keeps glancing sideways at him while pretending to check her watch, and the teenager behind him is openly taking a photo with his phone. Behind them is a normal glass bus shelter with a route map, a metal bench with someone's briefcase on it, and a route 42 sign at the kerb, which makes the diver stand out even more. Perhaps he lost a bet, or he is on his way to a costume party."
   }
