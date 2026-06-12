@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Kit } from "../pac-meeting/mansion-kit";
 import { hash01 } from "./compile";
 import { sharedMaterial } from "./materials";
-import { colorFromText, pick, SKIN_TONES, TROUSER_PALETTE } from "./palette";
+import { colorFromText, HAIR_PALETTE, pick, SKIN_TONES, TROUSER_PALETTE } from "./palette";
 import { faceMaterial, stripedMaterial } from "./textures";
 import type { Mood } from "./textures";
 import type { PlacedEntity } from "./compile";
@@ -63,6 +63,10 @@ interface PersonGeometry {
   hand: THREE.SphereGeometry;
   thigh: THREE.CapsuleGeometry;
   shin: THREE.CapsuleGeometry;
+  /** Open-bottomed dome a hair's breadth wider than the skull. */
+  hairCap: THREE.SphereGeometry;
+  /** Unit ellipsoid scaled per-figure into the long back fall. */
+  hairFall: THREE.SphereGeometry;
 }
 
 // One geometry set per Kit (i.e. per scene build); every figure reuses it.
@@ -81,6 +85,10 @@ function geometryFor(kit: Kit): PersonGeometry {
       hand: kit.track(new THREE.SphereGeometry(0.05, 10, 8)),
       thigh: kit.track(new THREE.CapsuleGeometry(0.07, 0.28, 4, 10)),
       shin: kit.track(new THREE.CapsuleGeometry(0.055, 0.26, 4, 10)),
+      hairCap: kit.track(
+        new THREE.SphereGeometry(0.127, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      ),
+      hairFall: kit.track(new THREE.SphereGeometry(0.1, 12, 10)),
     };
     geometryCache.set(kit, geometry);
   }
@@ -92,6 +100,46 @@ interface Outfit {
   trousers: THREE.Material;
   skin: THREE.Material;
   shoes: THREE.Material;
+}
+
+// Two hair treatments: a short cap for the guys, cap plus a long back
+// fall for the girls. Descriptor words decide; a neutral descriptor
+// ("a barista", "a student") splits 50/50 on the entity-id seed.
+function genderFor(descriptor: string, id: string): "female" | "male" {
+  const text = descriptor.toLowerCase();
+  if (/\bwoman\b|\bwomen\b|\bgirl\b|\blady\b|\bmother\b|\bmum\b|\bmom\b|\bgrandmother\b|\bgrandma\b|\bwaitress\b|\bdaughter\b|\bsister\b|\bniece\b|\baunt\b/.test(text)) {
+    return "female";
+  }
+  if (/\bman\b|\bmen\b|\bboy\b|\bguy\b|\bgentleman\b|\bfather\b|\bdad\b|\bgrandfather\b|\bgrandpa\b|\bson\b|\bbrother\b|\bnephew\b|\buncle\b|\bwaiter\b/.test(text)) {
+    return "male";
+  }
+  return hash01(`${id}:gender`) < 0.5 ? "female" : "male";
+}
+
+function buildHair(
+  kit: Kit,
+  geometry: PersonGeometry,
+  head: THREE.Group,
+  entity: PlacedEntity,
+) {
+  const text = entity.descriptor.toLowerCase();
+  if (/\bbald\b|shaved head/.test(text)) return;
+  const tint = /elderly|\bold\b|grey-haired|gray-haired|white-haired/.test(text)
+    ? 0x9b9b98
+    : pick(HAIR_PALETTE, `${entity.id}:hair`);
+  const hair = sharedMaterial({ color: tint, roughness: 0.95 });
+  // The cap matches the skull's 1.15 y-stretch and tilts back so the rim
+  // sits above the brows in front and drops toward the nape behind.
+  const cap = kit.mesh(geometry.hairCap, hair, 0, 0.115, -0.008, head);
+  cap.name = "hairCap";
+  cap.scale.set(1.02, 1.15, 1.04);
+  cap.rotation.x = -0.22;
+  if (genderFor(entity.descriptor, entity.id) === "female") {
+    // Long fall down the back of the head to the shoulders.
+    const fall = kit.mesh(geometry.hairFall, hair, 0, 0, -0.075, head);
+    fall.name = "hairFall";
+    fall.scale.set(1.05, 1.9, 0.62);
+  }
 }
 
 function buildLeg(
@@ -192,6 +240,7 @@ function buildRig(
   // blends seamlessly with the plain-skin neck and hands.
   const skull = kit.mesh(geometry.head, faceMaterial(skinTint, mood), 0, 0.11, 0, head);
   skull.scale.y = 1.15;
+  buildHair(kit, geometry, head, entity);
 
   return {
     pose,

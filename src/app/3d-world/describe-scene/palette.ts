@@ -35,6 +35,11 @@ export const SKIN_TONES = [
   0xf1c6a7, 0xe3a983, 0xd99b6c, 0xc98a5e, 0xa9714b, 0x8d5a3b, 0x6f4530,
 ];
 
+/** Natural hair range, near-black through blonde. */
+export const HAIR_PALETTE = [
+  0x14161c, 0x241a12, 0x3d2b1a, 0x553820, 0x6e4a26, 0x8a6a3a, 0xb08d57,
+];
+
 /** Deterministic palette pick, seeded so the same id always dresses alike. */
 export function pick(palette: number[], seed: string): number {
   return palette[Math.floor(hash01(seed) * palette.length) % palette.length];
