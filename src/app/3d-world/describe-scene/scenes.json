@@ -72,6 +72,12 @@
         "name": "small dog",
         "position": "next to the picnic blanket",
         "detail": "tan dog with a red collar sniffing the grass"
+      },
+      {
+        "id": "o_pond_trees",
+        "name": "stand of trees",
+        "position": "around the pond",
+        "detail": "a loose ring of oaks of slightly different sizes circling the pond"
       }
     ],
     "spatial_relationships": [
@@ -104,16 +110,21 @@
         "subject": "o_pond",
         "relation": "is far behind",
         "target": "o_bench"
+      },
+      {
+        "subject": "o_pond_trees",
+        "relation": "surrounds",
+        "target": "o_pond"
       }
     ],
     "anomaly": null,
     "elements": {
       "counts": {
         "people": 2,
-        "objects": 8
+        "objects": 9
       }
     },
-    "model_answer": "This picture shows a quiet park on a sunny morning. In the foreground on the left, an elderly man wearing a grey cardigan and a flat cap is sitting on a green wooden bench, reading his newspaper. The bench sits in the shade of a large oak tree behind him. In the centre of the park there is a round stone fountain with a small jet of water. On the right in the foreground, a red and white checked picnic blanket is spread on the grass with a wicker basket on it, and a small tan dog with a red collar is sniffing around next to it. Far away on the left, beyond the oak tree, a small pond glints in the morning light, and a few flowering bushes grow across the back of the lawn. In the background on the right, a young woman in a bright orange running jacket is jogging along the path, just passing the fountain. Overall, it looks like a calm and peaceful start to the day."
+    "model_answer": "This picture shows a quiet park on a sunny morning. In the foreground on the left, an elderly man wearing a grey cardigan and a flat cap is sitting on a green wooden bench, reading his newspaper. The bench sits in the shade of a large oak tree behind him. In the centre of the park there is a round stone fountain with a small jet of water. On the right in the foreground, a red and white checked picnic blanket is spread on the grass with a wicker basket on it, and a small tan dog with a red collar is sniffing around next to it. Far away on the left, beyond the oak tree, a small pond ringed by a stand of trees glints in the morning light, and a few flowering bushes grow across the back of the lawn. In the background on the right, a young woman in a bright orange running jacket is jogging along the path, just passing the fountain. Overall, it looks like a calm and peaceful start to the day."
   },
   {
     "id": "cafe-rush",

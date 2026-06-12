@@ -70,6 +70,8 @@ const RELATIONS: { keyword: string; kind: RelationKind }[] = [
   { keyword: "on", kind: "on" },
   { keyword: "under", kind: "under" },
   { keyword: "inside", kind: "under" },
+  // "around" centers on the anchor; the builder spreads outward from there.
+  { keyword: "around", kind: "under" },
 ];
 
 // Words that never identify an anchor entity ("on the counter, left end").

@@ -310,24 +310,89 @@ const buildFountain: ObjectBuilder = (kit, parent) => {
   };
 };
 
-const buildTree: ObjectBuilder = (kit, parent) => {
+// Oak parts are cached per kit so a single tree and a whole stand share
+// one geometry set.
+interface OakGeometry {
+  trunk: THREE.CylinderGeometry;
+  flare: THREE.CylinderGeometry;
+  limb: THREE.CylinderGeometry;
+  crown: THREE.SphereGeometry;
+  tuft: THREE.SphereGeometry;
+  cap: THREE.SphereGeometry;
+}
+
+const oakCache = new WeakMap<Kit, OakGeometry>();
+
+function oakGeometryFor(kit: Kit): OakGeometry {
+  let geometry = oakCache.get(kit);
+  if (!geometry) {
+    geometry = {
+      trunk: kit.track(new THREE.CylinderGeometry(0.17, 0.3, 1.7, 10)),
+      flare: kit.track(new THREE.CylinderGeometry(0.3, 0.46, 0.18, 10)),
+      limb: kit.track(new THREE.CylinderGeometry(0.06, 0.1, 0.7, 8)),
+      crown: kit.track(new THREE.SphereGeometry(0.85, 14, 10)),
+      tuft: kit.track(new THREE.SphereGeometry(0.55, 12, 9)),
+      cap: kit.track(new THREE.SphereGeometry(0.45, 12, 9)),
+    };
+    oakCache.set(kit, geometry);
+  }
+  return geometry;
+}
+
+/** One oak, planted at a local offset with its own yaw and size. */
+function plantOak(
+  kit: Kit,
+  parent: THREE.Group,
+  x: number,
+  z: number,
+  scale: number,
+  yaw: number,
+): void {
+  const geometry = oakGeometryFor(kit);
   const bark = woodMaterial(0x5d4023, 0.95);
   const leafDark = foliageMaterial(0x3a6b35);
   const leafLight = foliageMaterial(0x4c7e3e);
-  kit.mesh(kit.track(new THREE.CylinderGeometry(0.17, 0.3, 1.7, 10)), bark, 0, 0.85, 0, parent);
-  kit.mesh(kit.track(new THREE.CylinderGeometry(0.3, 0.46, 0.18, 10)), bark, 0, 0.09, 0, parent); // root flare
-  const limb = kit.mesh(
-    kit.track(new THREE.CylinderGeometry(0.06, 0.1, 0.7, 8)), bark, 0.34, 1.5, 0.1, parent,
-  );
+  const oak = new THREE.Group();
+  oak.position.set(x, 0, z);
+  oak.rotation.y = yaw;
+  oak.scale.setScalar(scale);
+  parent.add(oak);
+  kit.mesh(geometry.trunk, bark, 0, 0.85, 0, oak);
+  kit.mesh(geometry.flare, bark, 0, 0.09, 0, oak); // root flare
+  const limb = kit.mesh(geometry.limb, bark, 0.34, 1.5, 0.1, oak);
   limb.rotation.z = -0.7;
   // Two-tone speckled foliage so the crown reads as a mass of leaves.
-  const crownGeometry = kit.track(new THREE.SphereGeometry(0.85, 14, 10));
-  kit.mesh(crownGeometry, leafDark, 0, 2.15, 0, parent);
-  const tuftGeometry = kit.track(new THREE.SphereGeometry(0.55, 12, 9));
-  kit.mesh(tuftGeometry, leafLight, 0.62, 1.8, 0.22, parent);
-  kit.mesh(tuftGeometry, leafDark, -0.55, 1.9, -0.15, parent);
-  const capGeometry = kit.track(new THREE.SphereGeometry(0.45, 12, 9));
-  kit.mesh(capGeometry, leafLight, 0.12, 2.7, -0.08, parent);
+  kit.mesh(geometry.crown, leafDark, 0, 2.15, 0, oak);
+  kit.mesh(geometry.tuft, leafLight, 0.62, 1.8, 0.22, oak);
+  kit.mesh(geometry.tuft, leafDark, -0.55, 1.9, -0.15, oak);
+  kit.mesh(geometry.cap, leafLight, 0.12, 2.7, -0.08, oak);
+}
+
+const buildTree: ObjectBuilder = (kit, parent) => {
+  plantOak(kit, parent, 0, 0, 1, 0);
+  return undefined;
+};
+
+/** A loose stand of the same oak around the anchor point — back half and
+ *  sides only, so whatever it rings (the pond) stays visible from the
+ *  camera. Each tree gets its own yaw and a slightly different size. */
+const buildTreeCluster: ObjectBuilder = (kit, parent) => {
+  const ring: [number, number, number][] = [
+    // [azimuth from +z (radians), radius, scale]
+    [1.7, 2.5, 0.8],
+    [2.6, 2.7, 1.0],
+    [3.7, 2.4, 0.7],
+    [4.8, 2.6, 0.9],
+  ];
+  ring.forEach(([azimuth, radius, scale], i) => {
+    plantOak(
+      kit, parent,
+      Math.sin(azimuth) * radius,
+      Math.cos(azimuth) * radius,
+      scale,
+      i * 1.9, // varied facing
+    );
+  });
   return undefined;
 };
 
@@ -945,6 +1010,7 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/bench/, buildBench],
   [/shelter/, buildShelter],
   [/fountain/, buildFountain],
+  [/grove|stand of trees|\btrees\b/, buildTreeCluster],
   [/tree|oak/, buildTree],
   [/counter/, buildCounter],
   [/espresso|machine/, buildMachine],
