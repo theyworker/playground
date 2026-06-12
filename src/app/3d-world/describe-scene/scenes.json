@@ -287,6 +287,30 @@
         "name": "potted fern",
         "position": "foreground left, beside the umbrella stand",
         "detail": "leafy green fern in a terracotta pot"
+      },
+      {
+        "id": "o_mug_rack",
+        "name": "mug rack",
+        "position": "midground, against the left wall",
+        "detail": "wooden display rack hung with colourful coffee mugs"
+      },
+      {
+        "id": "o_brew_shelf",
+        "name": "brewing shelf",
+        "position": "background, against the left wall",
+        "detail": "shelf of copper coffee pots and a tall French press"
+      },
+      {
+        "id": "o_grinder",
+        "name": "coffee grinder",
+        "position": "on the brewing shelf",
+        "detail": "antique hand grinder with a wooden crank"
+      },
+      {
+        "id": "o_bean_sacks",
+        "name": "coffee bean sacks",
+        "position": "foreground, far left",
+        "detail": "two burlap sacks of roasted beans, one spilling open"
       }
     ],
     "spatial_relationships": [
@@ -354,16 +378,26 @@
         "subject": "o_plant_fern",
         "relation": "is standing beside",
         "target": "o_umbrella_stand"
+      },
+      {
+        "subject": "o_grinder",
+        "relation": "is sitting on",
+        "target": "o_brew_shelf"
+      },
+      {
+        "subject": "o_bean_sacks",
+        "relation": "are slumped in front of",
+        "target": "o_mug_rack"
       }
     ],
     "anomaly": null,
     "elements": {
       "counts": {
         "people": 8,
-        "objects": 13
+        "objects": 17
       }
     },
-    "model_answer": "This is a busy corner café on a rainy morning. Behind the counter at the back, a barista in a black apron is steaming milk at a chrome espresso machine, and a chalkboard menu hangs above her. At the right end of the counter there is a glass pastry case full of croissants, and a man in a navy suit is waiting in front of it, checking his phone while holding a wet umbrella. In the foreground on the right, a student wearing headphones is typing on a laptop at a small window table; you can see rain streaking the glass behind him. In the back left corner, a mother in a yellow raincoat is wiping the table while her little boy kneels on his chair and waves at the door. Next to the entrance, a metal umbrella stand is already crowded with dripping umbrellas, with a leafy potted fern standing beside it. Three matching marble-topped bistro tables are dotted around the room, and at each one sits what looks like the same man in a different coloured t-shirt — one in red reading the sports pages under a warm brass pendant lamp, one in green typing on a laptop, and one in blue drinking a flat white. A narrow bookshelf full of worn paperbacks stands against the back wall, and a station clock with a brass rim hangs high above the pastry case, so it is clearly a wet and hectic start to the day."
+    "model_answer": "This is a busy corner café on a rainy morning. Behind the counter at the back, a barista in a black apron is steaming milk at a chrome espresso machine, and a chalkboard menu hangs above her. At the right end of the counter there is a glass pastry case full of croissants, and a man in a navy suit is waiting in front of it, checking his phone while holding a wet umbrella. In the foreground on the right, a student wearing headphones is typing on a laptop at a small window table; you can see rain streaking the glass behind him. In the back left corner, a mother in a yellow raincoat is wiping the table while her little boy kneels on his chair and waves at the door. Next to the entrance, a metal umbrella stand is already crowded with dripping umbrellas, with a leafy potted fern standing beside it. Three matching marble-topped bistro tables are dotted around the room, and at each one sits what looks like the same man in a different coloured t-shirt — one in red reading the sports pages under a warm brass pendant lamp, one in green typing on a laptop, and one in blue drinking a flat white. A narrow bookshelf full of worn paperbacks stands against the back wall, and a station clock with a brass rim hangs high above the pastry case. All along the left wall the shop shows off its coffee gear — a wooden rack hung with colourful mugs, a shelf of copper pots with an antique hand grinder, and two burlap sacks of roasted beans, one spilling open on the floor — so it is clearly a proper coffee shop on a wet and hectic morning."
   },
   {
     "id": "bus-stop-diver",
