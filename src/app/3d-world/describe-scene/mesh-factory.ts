@@ -35,6 +35,7 @@ const COLOR_WORDS: [RegExp, number][] = [
   [/\bbrown\b|\bleather\b|\bwood(en)?\b/, 0x6b4a2c],
   [/\bpink\b/, 0xd98ca6],
   [/\bpurple\b/, 0x7a5ba6],
+  [/\bmarble\b/, 0xd9d6ce],
 ];
 
 // Color words in the descriptor win; otherwise a deterministic id-seeded
@@ -282,9 +283,14 @@ function buildPerson(
   const rig = buildPersonRig(kit, parent, tint, entity.id);
   const pose = poseFor(entity.action);
   // Anyone placed "on" a surface (bench, chair) sits regardless of what
-  // their hands are doing; sit/type imply sitting even on open ground.
+  // their hands are doing; sit/type and actions phrased as "sitting and
+  // reading/drinking" imply sitting even on open ground.
   const anchored = entity.transform.position[1] > 0.1;
-  const seated = anchored || pose === "sit" || pose === "type";
+  const seated =
+    anchored ||
+    pose === "sit" ||
+    pose === "type" ||
+    /\bsitting\b|\bseated\b/.test((entity.action ?? "").toLowerCase());
   if (seated) foldSeated(kit, rig, parent, anchored);
   return buildPersonPose(kit, rig, pose, seated);
 }
@@ -634,6 +640,64 @@ const buildSign: ObjectBuilder = (kit, parent, entity) => {
   return undefined;
 };
 
+const buildLamp: ObjectBuilder = (kit, parent) => {
+  const brass = kit.material({ color: 0xb08d3a, metalness: 0.7, roughness: 0.35 });
+  const shadeBrass = kit.material({
+    color: 0xb08d3a, metalness: 0.7, roughness: 0.35,
+    side: THREE.DoubleSide,
+  });
+  const cordGeometry = kit.track(new THREE.CylinderGeometry(0.012, 0.012, 1.2, 6));
+  kit.mesh(cordGeometry, brass, 0, 0.7, 0, parent);
+  const shadeGeometry = kit.track(new THREE.ConeGeometry(0.24, 0.2, 16, 1, true));
+  kit.mesh(shadeGeometry, shadeBrass, 0, 0.12, 0, parent);
+  const bulbMaterial = kit.material({
+    color: 0xffe9b8, emissive: 0xffd98a, emissiveIntensity: 1.2,
+  });
+  const bulbGeometry = kit.track(new THREE.SphereGeometry(0.05, 10, 8));
+  const bulb = kit.mesh(bulbGeometry, bulbMaterial, 0, 0.04, 0, parent);
+  bulb.castShadow = false;
+  const glow = kit.track(new THREE.PointLight(0xffd9a0, 0.7, 6, 2));
+  parent.add(glow);
+  return undefined;
+};
+
+const buildClock: ObjectBuilder = (kit, parent) => {
+  const brass = kit.material({ color: 0xb08d3a, metalness: 0.7, roughness: 0.35 });
+  const bodyGeometry = kit.track(
+    new THREE.CylinderGeometry(0.26, 0.26, 0.06, 24).rotateX(Math.PI / 2),
+  );
+  kit.mesh(bodyGeometry, brass, 0, 0, 0, parent);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#f1ecdf";
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.strokeStyle = "#2b2e33";
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(64 + Math.cos(angle) * 48, 64 + Math.sin(angle) * 48);
+    ctx.lineTo(64 + Math.cos(angle) * 56, 64 + Math.sin(angle) * 56);
+    ctx.stroke();
+  }
+  // Hands frozen at ten past ten, the classic shop-clock pose.
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(64, 64);
+  ctx.lineTo(64 + Math.cos(-Math.PI * 0.83) * 30, 64 + Math.sin(-Math.PI * 0.83) * 30);
+  ctx.moveTo(64, 64);
+  ctx.lineTo(64 + Math.cos(-Math.PI * 0.17) * 42, 64 + Math.sin(-Math.PI * 0.17) * 42);
+  ctx.stroke();
+  const faceTexture = kit.track(new THREE.CanvasTexture(canvas));
+  const faceMaterial = kit.track(new THREE.MeshStandardMaterial({ map: faceTexture }));
+  const faceGeometry = kit.track(new THREE.CircleGeometry(0.23, 24));
+  const face = new THREE.Mesh(faceGeometry, faceMaterial);
+  face.position.z = 0.035;
+  parent.add(face);
+  return undefined;
+};
+
 const buildBriefcase: ObjectBuilder = (kit, parent) => {
   const leather = kit.material({ color: 0x5d3a1e, roughness: 0.6 });
   const body = kit.box(leather, 0, 0.16, 0, 0.42, 0.3, 0.12, false, parent);
@@ -678,6 +742,28 @@ const buildShelf: ObjectBuilder = (kit, parent, entity) => {
   for (const y of [0.3, 0.8, 1.3]) {
     kit.box(wood, 0, y, 0, 1.16, 0.05, 0.32, false, parent);
   }
+  if (/book|paperback/.test(entity.descriptor.toLowerCase())) {
+    const palette = [0xb04a4a, 0x4a6fb0, 0x4ab06f, 0xb0974a].map((color) =>
+      kit.material({ color, roughness: 0.85 }),
+    );
+    // Deterministic ragged row of spines on the lower two boards.
+    for (const boardY of [0.3, 0.8]) {
+      let x = -0.5;
+      let i = 0;
+      while (x < 0.42) {
+        const width = 0.07 + ((i * 7) % 4) * 0.015;
+        const height = 0.26 + ((i * 3) % 3) * 0.03;
+        kit.box(
+          palette[i % palette.length],
+          x + width / 2, boardY + 0.025 + height / 2, 0,
+          width, height, 0.24,
+          false, parent,
+        );
+        x += width + 0.015;
+        i++;
+      }
+    }
+  }
   return undefined;
 };
 
@@ -685,6 +771,9 @@ const buildShelf: ObjectBuilder = (kit, parent, entity) => {
 const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/umbrella stand/, buildUmbrellaStand],
   [/stop sign|bus sign|street sign/, buildSign],
+  // "lamp hanging over the tables" must not hit the table builder.
+  [/lamp|pendant|lantern/, buildLamp],
+  [/clock/, buildClock],
   // "shelter bench" must hit the bench builder, not the shelter one.
   [/bench/, buildBench],
   [/shelter/, buildShelter],

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Kit } from "../pac-meeting/mansion-kit";
+import { makeWallpaperTexture } from "../pac-meeting/decor";
 import type { SceneSetting } from "./types";
 
 // Setting-driven stage dressing: lights tuned by time_of_day/weather,
@@ -139,8 +140,25 @@ export function buildEnvironment(setting: SceneSetting): EnvironmentBuild {
   const rainy = /rain|storm|drizzle/.test(setting.weather.toLowerCase());
 
   if (setting.indoor) {
-    const floor = kit.material({ color: 0x6b4a2c, roughness: 0.8 });
-    const wall = kit.material({ color: 0xd9cdb4, roughness: 0.95 });
+    // Wallpapered walls (shared canvas-texture helper) over a plank floor
+    // give interiors a lived-in café feel instead of bare slabs.
+    const wallpaper = kit.track(makeWallpaperTexture());
+    wallpaper.repeat.set(10, 2);
+    const wall = kit.material({ map: wallpaper, roughness: 0.95 });
+    const plankCanvas = document.createElement("canvas");
+    plankCanvas.width = plankCanvas.height = 128;
+    const ctx = plankCanvas.getContext("2d")!;
+    ctx.fillStyle = "#7a5a38";
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = "#6b4d2e";
+    for (let y = 0; y < 128; y += 32) {
+      ctx.fillRect(0, y, 128, 3);
+      ctx.fillRect((y * 2) % 128, y + 3, 3, 29); // staggered plank ends
+    }
+    const plankTexture = kit.track(new THREE.CanvasTexture(plankCanvas));
+    plankTexture.wrapS = plankTexture.wrapT = THREE.RepeatWrapping;
+    plankTexture.repeat.set(6, 6);
+    const floor = kit.material({ map: plankTexture, roughness: 0.8 });
     const trim = kit.material({ color: 0x4a3a28, roughness: 0.85 });
     const width = ROOM_HALF_X * 2;
     const depth = ROOM_FRONT_Z - ROOM_BACK_Z;
