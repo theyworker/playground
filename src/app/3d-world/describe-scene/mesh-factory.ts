@@ -1,6 +1,17 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Kit } from "../pac-meeting/mansion-kit";
 import { hash01 } from "./compile";
+import { finish, sharedMaterial } from "./materials";
+import {
+  fitText,
+  foliageMaterial,
+  surfaceMaterial,
+  woodMaterial,
+} from "./textures";
+import { colorFromText } from "./palette";
+import { buildPerson } from "./person";
+import type { Update } from "./person";
 import type { PlacedEntity } from "./compile";
 
 // Procedural mesh factory: turns compiled PlacedEntity records into
@@ -8,6 +19,10 @@ import type { PlacedEntity } from "./compile";
 // text. No external assets — boxes, spheres, capsules, cylinders, and
 // canvas textures only. Any descriptor without a mapping falls back to a
 // tinted, labeled box so a scene can never fail to render.
+//
+// Materials come from the sharedMaterial cache (one instance per tint) and
+// are never tracked on the kit — only geometries and canvas textures are
+// per-scene disposables.
 
 export interface BuiltScene {
   group: THREE.Group;
@@ -17,43 +32,12 @@ export interface BuiltScene {
   fallbacks: string[];
 }
 
-type Update = (elapsed: number) => void;
-
-const SKIN = 0xe3a983;
-
-const COLOR_WORDS: [RegExp, number][] = [
-  [/\bnavy\b/, 0x2c3e63],
-  [/\bblue\b/, 0x3b6ea5],
-  [/\borange\b/, 0xd97a2b],
-  [/\bred\b/, 0xb33a3a],
-  [/\bgreen\b/, 0x3f7a44],
-  [/\byellow\b/, 0xd9b832],
-  [/\bbeige\b|\btan\b/, 0xcbb594],
-  [/\bgrey\b|\bgray\b/, 0x8a8d93],
-  [/\bblack\b/, 0x2b2e33],
-  [/\bwhite\b/, 0xe8e8e4],
-  [/\bbrown\b|\bleather\b|\bwood(en)?\b/, 0x6b4a2c],
-  [/\bpink\b/, 0xd98ca6],
-  [/\bpurple\b/, 0x7a5ba6],
-];
-
-// Color words in the descriptor win; otherwise a deterministic id-seeded
-// tint so figures differ without randomness.
-function colorFromText(text: string, seed: string): number {
-  const lower = text.toLowerCase();
-  for (const [pattern, color] of COLOR_WORDS) {
-    if (pattern.test(lower)) return color;
-  }
-  return new THREE.Color()
-    .setHSL(hash01(`${seed}:hue`), 0.4, 0.5)
-    .getHex();
-}
-
-// Kit.canvasPlane always parents into kit.group; entities need planes
-// inside their own group, so this mirrors it with a parent parameter.
+// A drawn plane backed by the procedural texture cache: the same key
+// reuses the same texture/material across rebuilds and scene switches.
 function canvasPlane(
   kit: Kit,
   parent: THREE.Object3D,
+  key: string,
   draw: (ctx: CanvasRenderingContext2D) => void,
   canvasW: number,
   canvasH: number,
@@ -63,230 +47,18 @@ function canvasPlane(
   y: number,
   z: number,
   rotationY = 0,
+  transparent = false,
 ): THREE.Mesh {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvasW;
-  canvas.height = canvasH;
-  draw(canvas.getContext("2d")!);
-  const texture = kit.track(new THREE.CanvasTexture(canvas));
-  const material = kit.track(new THREE.MeshStandardMaterial({ map: texture }));
+  const material = surfaceMaterial(key, canvasW, canvasH, draw, {
+    roughness: 0.9,
+    transparent,
+  });
   const geometry = kit.track(new THREE.PlaneGeometry(planeW, planeH));
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(x, y, z);
   mesh.rotation.y = rotationY;
   parent.add(mesh);
   return mesh;
-}
-
-// ---------------------------------------------------------------------------
-// People: capsule body + sphere head, posed from the manifest action.
-// ---------------------------------------------------------------------------
-
-interface PersonRig {
-  pose: THREE.Group; // origin at the feet; poses lean/shift this
-  head: THREE.Mesh;
-  leftArm: THREE.Group; // pivot at shoulder
-  rightArm: THREE.Group;
-  leftLeg: THREE.Group; // pivot at hip
-  rightLeg: THREE.Group;
-  bodyMaterial: THREE.Material;
-  phase: number;
-}
-
-function buildPersonRig(
-  kit: Kit,
-  parent: THREE.Group,
-  tint: number,
-  id: string,
-): PersonRig {
-  const pose = new THREE.Group();
-  parent.add(pose);
-
-  const bodyMaterial = kit.material({ color: tint, roughness: 0.8 });
-  const skinMaterial = kit.material({ color: SKIN, roughness: 0.7 });
-
-  const torsoGeometry = kit.track(new THREE.CapsuleGeometry(0.22, 0.45, 4, 12));
-  kit.mesh(torsoGeometry, bodyMaterial, 0, 1.15, 0, pose);
-
-  const headGeometry = kit.track(new THREE.SphereGeometry(0.16, 16, 12));
-  const head = kit.mesh(headGeometry, skinMaterial, 0, 1.72, 0, pose);
-
-  const armGeometry = kit.track(new THREE.CapsuleGeometry(0.065, 0.42, 4, 8));
-  const legGeometry = kit.track(new THREE.CapsuleGeometry(0.085, 0.6, 4, 8));
-
-  const limb = (
-    geometry: THREE.BufferGeometry,
-    x: number,
-    y: number,
-    drop: number,
-  ): THREE.Group => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, y, 0);
-    pose.add(pivot);
-    kit.mesh(geometry, bodyMaterial, 0, -drop, 0, pivot);
-    return pivot;
-  };
-
-  return {
-    pose,
-    head,
-    leftArm: limb(armGeometry, -0.29, 1.45, 0.28),
-    rightArm: limb(armGeometry, 0.29, 1.45, 0.28),
-    leftLeg: limb(legGeometry, -0.11, 0.85, 0.42),
-    rightLeg: limb(legGeometry, 0.11, 0.85, 0.42),
-    bodyMaterial,
-    phase: hash01(`${id}:phase`) * Math.PI * 2,
-  };
-}
-
-type PoseName =
-  | "idle" | "run" | "sit" | "read" | "drink"
-  | "type" | "reach" | "wave" | "check" | "photo";
-
-// Ordered: first match wins, so "typing while sipping" types rather than
-// drinks.
-const ACTION_POSES: [RegExp, PoseName][] = [
-  [/photo|photograph|filming/, "photo"],
-  [/wav(e|ing)/, "wave"],
-  [/typing|laptop|working on/, "type"],
-  [/read/, "read"],
-  [/drink|sipping|\bsip\b/, "drink"],
-  [/jog|runn?ing|sprint/, "run"],
-  [/checking|glanc/, "check"],
-  [/wip(e|ing)|steam|operat|clean|serv|pour/, "reach"],
-  [/sitting|seated|kneel/, "sit"],
-];
-
-function poseFor(action: string | undefined): PoseName {
-  const text = (action ?? "").toLowerCase();
-  for (const [pattern, pose] of ACTION_POSES) {
-    if (pattern.test(text)) return pose;
-  }
-  return "idle";
-}
-
-// Folds the rig into a seated layout (hips at the pose origin). Used by
-// "sit" and "type"; adds a procedural seat when nothing was placed under.
-function foldSeated(kit: Kit, rig: PersonRig, parent: THREE.Group, anchored: boolean) {
-  rig.pose.position.y = -0.82;
-  rig.leftLeg.rotation.x = -1.35;
-  rig.rightLeg.rotation.x = -1.35;
-  if (!anchored) {
-    rig.pose.position.y += 0.5;
-    const seatMaterial = kit.material({ color: 0x4a3a28, roughness: 0.9 });
-    kit.box(seatMaterial, 0, 0.24, -0.05, 0.5, 0.48, 0.5, false, parent);
-  }
-}
-
-function buildPersonPose(
-  kit: Kit,
-  rig: PersonRig,
-  pose: PoseName,
-  seated: boolean,
-): Update | undefined {
-  const propMaterial = kit.material({ color: 0xd9d2c0, roughness: 0.85 });
-  const darkProp = kit.material({ color: 0x33363d, roughness: 0.6 });
-
-  switch (pose) {
-    case "run": {
-      if (seated) return undefined; // can't jog while folded onto a seat
-      rig.pose.rotation.x = 0.28;
-      return (t) => {
-        const swing = Math.sin(t * 7 + rig.phase);
-        rig.leftLeg.rotation.x = swing * 0.75;
-        rig.rightLeg.rotation.x = -swing * 0.75;
-        rig.leftArm.rotation.x = -swing * 0.65;
-        rig.rightArm.rotation.x = swing * 0.65;
-        rig.pose.position.y = Math.abs(Math.sin(t * 7 + rig.phase)) * 0.06;
-      };
-    }
-    case "sit":
-      rig.leftArm.rotation.x = -0.4;
-      rig.rightArm.rotation.x = -0.4;
-      return undefined;
-    case "read": {
-      rig.leftArm.rotation.x = -1.1;
-      rig.rightArm.rotation.x = -1.1;
-      rig.head.rotation.x = 0.3;
-      // The "book": two thin angled boxes held at chest height.
-      const page = (side: number) => {
-        const mesh = kit.box(propMaterial, side * 0.09, 1.18, 0.33, 0.18, 0.24, 0.02, false, rig.pose);
-        mesh.rotation.y = -side * 0.4;
-      };
-      page(-1);
-      page(1);
-      return undefined;
-    }
-    case "drink": {
-      rig.rightArm.rotation.x = -2.3;
-      const cupGeometry = kit.track(new THREE.CylinderGeometry(0.05, 0.04, 0.12, 10));
-      kit.mesh(cupGeometry, propMaterial, 0.18, 1.58, 0.16, rig.pose);
-      return (t) => {
-        rig.head.rotation.x = -0.1 + Math.sin(t * 0.8 + rig.phase) * 0.05;
-      };
-    }
-    case "type": {
-      rig.leftArm.rotation.x = -1.0;
-      rig.rightArm.rotation.x = -1.0;
-      rig.head.rotation.x = 0.35;
-      // Laptop: base + tilted screen in front of the lap.
-      kit.box(darkProp, 0, 0.62, 0.32, 0.34, 0.02, 0.24, false, rig.pose);
-      const screen = kit.box(darkProp, 0, 0.76, 0.42, 0.34, 0.26, 0.015, false, rig.pose);
-      screen.rotation.x = -0.25;
-      return (t) => {
-        const tap = Math.sin(t * 9 + rig.phase) * 0.06;
-        rig.leftArm.rotation.x = -1.0 + tap;
-        rig.rightArm.rotation.x = -1.0 - tap;
-      };
-    }
-    case "reach": {
-      if (!seated) rig.pose.rotation.x = 0.22;
-      rig.leftArm.rotation.x = -1.25;
-      rig.rightArm.rotation.x = -1.25;
-      return (t) => {
-        rig.rightArm.rotation.z = Math.sin(t * 3 + rig.phase) * 0.15;
-      };
-    }
-    case "wave": {
-      rig.rightArm.rotation.z = 2.6;
-      return (t) => {
-        rig.rightArm.rotation.z = 2.6 + Math.sin(t * 6 + rig.phase) * 0.25;
-      };
-    }
-    case "check": {
-      rig.rightArm.rotation.x = -1.9;
-      rig.head.rotation.x = 0.35;
-      kit.box(darkProp, 0.2, 1.5, 0.22, 0.08, 0.14, 0.015, false, rig.pose);
-      return undefined;
-    }
-    case "photo": {
-      rig.leftArm.rotation.x = -1.7;
-      rig.rightArm.rotation.x = -1.7;
-      kit.box(darkProp, 0, 1.62, 0.3, 0.16, 0.1, 0.03, false, rig.pose);
-      return undefined;
-    }
-    case "idle":
-      return (t) => {
-        rig.pose.rotation.z = Math.sin(t * 1.2 + rig.phase) * 0.02;
-      };
-  }
-}
-
-function buildPerson(
-  kit: Kit,
-  parent: THREE.Group,
-  entity: PlacedEntity,
-  tintOverride?: number,
-): Update | undefined {
-  const tint = tintOverride ?? colorFromText(entity.descriptor, entity.id);
-  const rig = buildPersonRig(kit, parent, tint, entity.id);
-  const pose = poseFor(entity.action);
-  // Anyone placed "on" a surface (bench, chair) sits regardless of what
-  // their hands are doing; sit/type imply sitting even on open ground.
-  const anchored = entity.transform.position[1] > 0.1;
-  const seated = anchored || pose === "sit" || pose === "type";
-  if (seated) foldSeated(kit, rig, parent, anchored);
-  return buildPersonPose(kit, rig, pose, seated);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,25 +73,25 @@ function anomalyScale(descriptor: string): number {
 }
 
 function buildScubaDiver(kit: Kit, parent: THREE.Group, entity: PlacedEntity): Update | undefined {
-  const update = buildPerson(kit, parent, entity, 0x23282f);
-  const gearMaterial = kit.material({ color: 0x8a929c, metalness: 0.5, roughness: 0.4 });
-  const rubberMaterial = kit.material({ color: 0x1b1e24, roughness: 0.9 });
-  // Tank on the back.
+  const { rig, update } = buildPerson(kit, parent, entity, 0x23282f);
+  const gearMaterial = sharedMaterial({ color: 0x8a929c, metalness: 0.5, roughness: 0.4 });
+  const rubberMaterial = sharedMaterial({ color: 0x1b1e24, roughness: 0.9 });
+  // Gear rides the rig parts so it follows pose, scale, and motion.
   const tankGeometry = kit.track(new THREE.CylinderGeometry(0.12, 0.12, 0.55, 12));
-  kit.mesh(tankGeometry, gearMaterial, 0, 1.2, -0.28, parent);
-  // Mask: a ring across the face.
-  const maskGeometry = kit.track(new THREE.TorusGeometry(0.1, 0.025, 8, 16));
-  kit.mesh(maskGeometry, gearMaterial, 0, 1.74, 0.13, parent);
-  // Flippers: flat boxes pointing forward from the feet.
-  kit.box(rubberMaterial, -0.11, 0.02, 0.18, 0.14, 0.04, 0.42, false, parent);
-  kit.box(rubberMaterial, 0.11, 0.02, 0.18, 0.14, 0.04, 0.42, false, parent);
+  kit.mesh(tankGeometry, gearMaterial, 0, 0.32, -0.22, rig.torso); // tank on the back
+  const maskGeometry = kit.track(new THREE.TorusGeometry(0.09, 0.025, 8, 16));
+  kit.mesh(maskGeometry, gearMaterial, 0, 0.13, 0.1, rig.head); // mask across the face
+  // Flippers: flat blades pointing forward from each foot.
+  for (const leg of [rig.leftLeg, rig.rightLeg]) {
+    kit.box(rubberMaterial, 0, -0.45, 0.22, 0.14, 0.035, 0.4, false, leg.joint);
+  }
   return update;
 }
 
 function buildPenguin(kit: Kit, parent: THREE.Group): Update {
-  const black = kit.material({ color: 0x1d2026, roughness: 0.8 });
-  const white = kit.material({ color: 0xe9e9e2, roughness: 0.8 });
-  const beak = kit.material({ color: 0xd9882b, roughness: 0.7 });
+  const black = sharedMaterial({ color: 0x1d2026, roughness: 0.8 });
+  const white = sharedMaterial({ color: 0xe9e9e2, roughness: 0.8 });
+  const beak = sharedMaterial({ color: 0xd9882b, roughness: 0.7 });
   // Body parts live in their own group so the waddle sway is contained.
   const body = new THREE.Group();
   parent.add(body);
@@ -337,8 +109,8 @@ function buildPenguin(kit: Kit, parent: THREE.Group): Update {
 }
 
 function buildSnowman(kit: Kit, parent: THREE.Group): undefined {
-  const snow = kit.material({ color: 0xf2f4f7, roughness: 0.95 });
-  const carrot = kit.material({ color: 0xd9882b, roughness: 0.7 });
+  const snow = sharedMaterial({ color: 0xf2f4f7, roughness: 0.95 });
+  const carrot = sharedMaterial({ color: 0xd9882b, roughness: 0.7 });
   const radii = [0.42, 0.3, 0.2];
   let y = 0;
   for (const radius of radii) {
@@ -353,8 +125,8 @@ function buildSnowman(kit: Kit, parent: THREE.Group): undefined {
 }
 
 function buildHorse(kit: Kit, parent: THREE.Group): undefined {
-  const coat = kit.material({ color: 0x6b4a2c, roughness: 0.9 });
-  const mane = kit.material({ color: 0x33261a, roughness: 0.95 });
+  const coat = sharedMaterial({ color: 0x6b4a2c, roughness: 0.9 });
+  const mane = sharedMaterial({ color: 0x33261a, roughness: 0.95 });
   kit.box(coat, 0, 1.05, 0, 0.5, 0.5, 1.2, false, parent); // body
   for (const [x, z] of [[-0.17, 0.45], [0.17, 0.45], [-0.17, -0.45], [0.17, -0.45]]) {
     kit.box(coat, x, 0.4, z, 0.13, 0.8, 0.13, false, parent);
@@ -367,10 +139,10 @@ function buildHorse(kit: Kit, parent: THREE.Group): undefined {
 }
 
 function buildSuitedDog(kit: Kit, parent: THREE.Group): undefined {
-  const fur = kit.material({ color: 0xb08d57, roughness: 0.9 });
+  const fur = sharedMaterial({ color: 0xb08d57, roughness: 0.9 });
   // The "suit" is a canvas texture wrapped on the body box.
   const suitBody = canvasPlane(
-    kit, parent,
+    kit, parent, "dog-suit",
     (ctx) => {
       ctx.fillStyle = "#2c3e63";
       ctx.fillRect(0, 0, 128, 128);
@@ -384,7 +156,7 @@ function buildSuitedDog(kit: Kit, parent: THREE.Group): undefined {
     128, 128, 0.42, 0.4, 0, 0.45, 0.231,
   );
   suitBody.castShadow = true;
-  const suitMaterial = kit.material({ color: 0x2c3e63, roughness: 0.8 });
+  const suitMaterial = sharedMaterial({ color: 0x2c3e63, roughness: 0.8 });
   kit.box(suitMaterial, 0, 0.45, 0, 0.4, 0.4, 0.46, false, parent);
   const headGeometry = kit.track(new THREE.SphereGeometry(0.16, 14, 10));
   kit.mesh(headGeometry, fur, 0, 0.82, 0.12, parent);
@@ -407,276 +179,542 @@ const ANOMALY_BUILDERS: [RegExp, (kit: Kit, parent: THREE.Group, entity: PlacedE
 ];
 
 // ---------------------------------------------------------------------------
-// Objects: primitive combos keyed off name + detail.
+// Objects: multi-primitive builds keyed off name + detail, designed so each
+// prop is recognizable from its silhouette alone. Soft chamfers via
+// RoundedBoxGeometry keep furniture from reading as programmer art, and all
+// surfaces use the shared finish recipes for one cohesive material language.
 // ---------------------------------------------------------------------------
 
 type ObjectBuilder = (kit: Kit, parent: THREE.Group, entity: PlacedEntity) => Update | undefined;
 
-function woodOf(kit: Kit, entity: PlacedEntity): THREE.Material {
-  return kit.material({
-    color: colorFromText(entity.descriptor, entity.id),
-    roughness: 0.85,
-  });
+// Rounded boxes are cached per kit by dimensions so repeated parts share.
+const roundedCache = new WeakMap<Kit, Map<string, THREE.BufferGeometry>>();
+
+function rbox(
+  kit: Kit,
+  material: THREE.Material,
+  x: number, y: number, z: number,
+  w: number, h: number, d: number,
+  parent: THREE.Object3D,
+  radius?: number,
+): THREE.Mesh {
+  const r = radius ?? Math.min(0.035, Math.min(w, h, d) * 0.24);
+  let perKit = roundedCache.get(kit);
+  if (!perKit) {
+    perKit = new Map();
+    roundedCache.set(kit, perKit);
+  }
+  const key = `${w}|${h}|${d}|${r}`;
+  let geometry = perKit.get(key);
+  if (!geometry) {
+    geometry = kit.track(new RoundedBoxGeometry(w, h, d, 2, r));
+    perKit.set(key, geometry);
+  }
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+// Soft contact blob under props: cheap grounding that the 1024px shadow map
+// can miss. One shared texture/geometry/material serves every prop.
+let blobMaterial: THREE.MeshBasicMaterial | null = null;
+let blobGeometry: THREE.PlaneGeometry | null = null;
+
+function contactShadow(parent: THREE.Object3D, rx: number, rz: number) {
+  if (!blobMaterial || !blobGeometry) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 128;
+    const ctx = canvas.getContext("2d")!;
+    const gradient = ctx.createRadialGradient(64, 64, 8, 64, 64, 64);
+    gradient.addColorStop(0, "rgba(0,0,0,0.4)");
+    gradient.addColorStop(0.7, "rgba(0,0,0,0.16)");
+    gradient.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+    blobMaterial = new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true,
+      depthWrite: false,
+    });
+    blobGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  }
+  const mesh = new THREE.Mesh(blobGeometry, blobMaterial);
+  mesh.scale.set(rx * 2, 1, rz * 2);
+  mesh.position.y = 0.012;
+  parent.add(mesh);
+}
+
+function woodOf(entity: PlacedEntity): THREE.Material {
+  return finish.wood(colorFromText(entity.descriptor, entity.id));
 }
 
 const buildBench: ObjectBuilder = (kit, parent, entity) => {
-  const paint = woodOf(kit, entity);
-  const iron = kit.material({ color: 0x3a3d42, metalness: 0.4, roughness: 0.6 });
-  kit.box(paint, 0, 0.46, 0, 1.7, 0.08, 0.55, false, parent); // seat
-  const back = kit.box(paint, 0, 0.78, -0.24, 1.7, 0.5, 0.07, false, parent);
-  back.rotation.x = -0.15;
-  for (const x of [-0.7, 0.7]) {
-    kit.box(iron, x, 0.21, 0, 0.08, 0.42, 0.5, false, parent);
+  const text = entity.descriptor.toLowerCase();
+  if (/metal|steel/.test(text)) {
+    // Narrow backless shelter bench: two steel slats on tube legs.
+    const steel = finish.metal(0x9aa0a8);
+    const frame = finish.iron(0x4a4d52);
+    for (const z of [-0.09, 0.09]) {
+      rbox(kit, steel, 0, 0.475, z, 1.5, 0.05, 0.15, parent);
+    }
+    const legGeometry = kit.track(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 10));
+    for (const x of [-0.6, 0.6]) {
+      kit.mesh(legGeometry, frame, x, 0.225, 0, parent);
+    }
+    return undefined;
+  }
+  // Park bench: painted slats over cast-iron sides with armrests.
+  const paint = finish.paint(colorFromText(entity.descriptor, entity.id));
+  const iron = finish.iron(0x33363b);
+  for (const z of [-0.2, -0.02, 0.16]) {
+    rbox(kit, paint, 0, 0.47, z, 1.7, 0.055, 0.155, parent); // seat slats
+  }
+  for (const [y, z] of [[0.68, -0.26], [0.87, -0.29]]) {
+    const slat = rbox(kit, paint, 0, y, z, 1.7, 0.14, 0.045, parent);
+    slat.rotation.x = -0.15;
+  }
+  const armGeometry = kit.track(
+    new THREE.CylinderGeometry(0.024, 0.024, 0.46, 8).rotateX(Math.PI / 2),
+  );
+  for (const x of [-0.78, 0.78]) {
+    kit.box(iron, x, 0.22, 0.16, 0.06, 0.44, 0.06, false, parent); // front leg
+    kit.box(iron, x, 0.22, -0.18, 0.06, 0.44, 0.06, false, parent); // rear leg
+    kit.box(iron, x, 0.44, -0.01, 0.06, 0.05, 0.48, false, parent); // side rail
+    kit.mesh(armGeometry, iron, x, 0.63, -0.03, parent); // armrest
+    kit.box(iron, x, 0.53, 0.15, 0.05, 0.16, 0.05, false, parent); // armrest post
   }
   return undefined;
 };
 
 const buildFountain: ObjectBuilder = (kit, parent) => {
-  const stone = kit.material({ color: 0x9b948a, roughness: 0.9 });
-  const water = kit.material({ color: 0x5d9bc4, roughness: 0.2, metalness: 0.1 });
-  const basinGeometry = kit.track(new THREE.CylinderGeometry(1.05, 1.15, 0.4, 24));
-  kit.mesh(basinGeometry, stone, 0, 0.2, 0, parent);
-  const poolGeometry = kit.track(new THREE.CylinderGeometry(0.95, 0.95, 0.06, 24));
-  kit.mesh(poolGeometry, water, 0, 0.4, 0, parent);
-  const columnGeometry = kit.track(new THREE.CylinderGeometry(0.12, 0.18, 0.6, 12));
-  kit.mesh(columnGeometry, stone, 0, 0.7, 0, parent);
-  const jetGeometry = kit.track(new THREE.CylinderGeometry(0.05, 0.09, 0.5, 8));
-  const jet = kit.mesh(jetGeometry, water, 0, 1.25, 0, parent);
+  const stone = finish.stone(0x9b948a);
+  const water = finish.water(0x5d9bc4);
+  // Two-tier stone fountain: basin with a lip, column, upper dish, jet.
+  kit.mesh(kit.track(new THREE.CylinderGeometry(1.08, 1.18, 0.34, 24)), stone, 0, 0.17, 0, parent);
+  kit.mesh(
+    kit.track(new THREE.TorusGeometry(1.08, 0.06, 10, 28).rotateX(Math.PI / 2)),
+    stone, 0, 0.35, 0, parent,
+  );
+  kit.mesh(kit.track(new THREE.CylinderGeometry(1.0, 1.0, 0.05, 24)), water, 0, 0.32, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.1, 0.16, 0.55, 12)), stone, 0, 0.6, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.42, 0.28, 0.12, 18)), stone, 0, 0.93, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.36, 0.36, 0.04, 18)), water, 0, 0.97, 0, parent);
+  const jet = kit.mesh(
+    kit.track(new THREE.CylinderGeometry(0.04, 0.07, 0.45, 8)), water, 0, 1.2, 0, parent,
+  );
   return (t) => {
     jet.scale.y = 1 + Math.sin(t * 4) * 0.12;
   };
 };
 
 const buildTree: ObjectBuilder = (kit, parent) => {
-  const bark = kit.material({ color: 0x5d4023, roughness: 0.95 });
-  const leaves = kit.material({ color: 0x3a6b35, roughness: 0.9 });
-  const trunkGeometry = kit.track(new THREE.CylinderGeometry(0.18, 0.26, 1.6, 10));
-  kit.mesh(trunkGeometry, bark, 0, 0.8, 0, parent);
+  const bark = woodMaterial(0x5d4023, 0.95);
+  const leafDark = foliageMaterial(0x3a6b35);
+  const leafLight = foliageMaterial(0x4c7e3e);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.17, 0.3, 1.7, 10)), bark, 0, 0.85, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.3, 0.46, 0.18, 10)), bark, 0, 0.09, 0, parent); // root flare
+  const limb = kit.mesh(
+    kit.track(new THREE.CylinderGeometry(0.06, 0.1, 0.7, 8)), bark, 0.34, 1.5, 0.1, parent,
+  );
+  limb.rotation.z = -0.7;
+  // Two-tone speckled foliage so the crown reads as a mass of leaves.
   const crownGeometry = kit.track(new THREE.SphereGeometry(0.85, 14, 10));
-  kit.mesh(crownGeometry, leaves, 0, 2.1, 0, parent);
+  kit.mesh(crownGeometry, leafDark, 0, 2.15, 0, parent);
   const tuftGeometry = kit.track(new THREE.SphereGeometry(0.55, 12, 9));
-  kit.mesh(tuftGeometry, leaves, 0.55, 1.75, 0.2, parent);
-  kit.mesh(tuftGeometry, leaves, -0.5, 1.85, -0.15, parent);
+  kit.mesh(tuftGeometry, leafLight, 0.62, 1.8, 0.22, parent);
+  kit.mesh(tuftGeometry, leafDark, -0.55, 1.9, -0.15, parent);
+  const capGeometry = kit.track(new THREE.SphereGeometry(0.45, 12, 9));
+  kit.mesh(capGeometry, leafLight, 0.12, 2.7, -0.08, parent);
   return undefined;
 };
 
 const buildCounter: ObjectBuilder = (kit, parent) => {
-  const wood = kit.material({ color: 0x5d4023, roughness: 0.7 });
-  const top = kit.material({ color: 0x3d2a16, roughness: 0.45 });
-  const brass = kit.material({ color: 0xb08d3a, metalness: 0.7, roughness: 0.35 });
-  kit.box(wood, 0, 0.44, 0, 2.8, 0.88, 0.7, false, parent);
-  kit.box(top, 0, 0.92, 0, 3.0, 0.06, 0.8, false, parent);
-  kit.box(brass, 1.1, 1.07, -0.1, 0.3, 0.24, 0.3, false, parent); // till
+  const wood = woodMaterial(0x5d4023);
+  const facing = woodMaterial(0x6b4a2c);
+  const top = woodMaterial(0x3d2a16, 0.4); // polished counter top
+  const brass = finish.metal(0xb08d3a);
+  const dark = finish.plastic(0x2b2e33);
+  rbox(kit, wood, 0, 0.44, 0, 2.8, 0.88, 0.7, parent, 0.03);
+  rbox(kit, top, 0, 0.92, 0, 3.0, 0.06, 0.8, parent, 0.025);
+  // Raised front panels give the cabinet a joinery silhouette.
+  for (const x of [-0.95, 0, 0.95]) {
+    rbox(kit, facing, x, 0.46, 0.345, 0.78, 0.6, 0.05, parent, 0.02);
+  }
+  const railGeometry = kit.track(
+    new THREE.CylinderGeometry(0.022, 0.022, 2.7, 8).rotateZ(Math.PI / 2),
+  );
+  kit.mesh(railGeometry, brass, 0, 0.1, 0.4, parent); // foot rail
+  // Brass till with a small keys block.
+  rbox(kit, brass, 1.1, 1.06, -0.1, 0.3, 0.22, 0.3, parent, 0.025);
+  rbox(kit, dark, 1.1, 1.19, -0.16, 0.26, 0.1, 0.14, parent, 0.02);
   return undefined;
 };
 
 const buildMachine: ObjectBuilder = (kit, parent) => {
-  const chrome = kit.material({ color: 0xb9bec7, metalness: 0.85, roughness: 0.25 });
-  const dark = kit.material({ color: 0x2b2e33, roughness: 0.5 });
-  kit.box(chrome, 0, 0.24, 0, 0.5, 0.46, 0.38, false, parent);
-  kit.box(dark, 0, 0.5, 0, 0.52, 0.07, 0.4, false, parent);
-  const spoutGeometry = kit.track(new THREE.CylinderGeometry(0.025, 0.025, 0.12, 8));
-  kit.mesh(spoutGeometry, dark, 0.12, 0.1, 0.22, parent);
+  const chrome = finish.metal(0xb9bec7);
+  const dark = finish.plastic(0x2b2e33);
+  const ceramic = finish.ceramic(0xe8e4d8);
+  rbox(kit, chrome, 0, 0.27, 0, 0.5, 0.44, 0.36, parent, 0.04); // body
+  rbox(kit, dark, 0, 0.51, 0, 0.52, 0.06, 0.38, parent, 0.02); // warming tray
+  rbox(kit, dark, 0, 0.05, 0.17, 0.44, 0.05, 0.18, parent, 0.015); // drip tray
+  // Group head with a portafilter handle pointing out.
+  const headGeometry = kit.track(new THREE.CylinderGeometry(0.05, 0.05, 0.09, 10));
+  kit.mesh(headGeometry, dark, 0, 0.21, 0.2, parent);
+  const handleGeometry = kit.track(
+    new THREE.CylinderGeometry(0.018, 0.022, 0.16, 8).rotateX(Math.PI / 2),
+  );
+  kit.mesh(handleGeometry, dark, 0, 0.17, 0.31, parent);
+  // Steam wand angled off the right side.
+  const wandGeometry = kit.track(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 6));
+  const wand = kit.mesh(wandGeometry, chrome, 0.27, 0.3, 0.1, parent);
+  wand.rotation.z = -0.5;
+  // Cups warming on top.
+  const cupGeometry = kit.track(new THREE.CylinderGeometry(0.045, 0.035, 0.08, 10));
+  for (const x of [-0.12, 0.02, 0.14]) {
+    kit.mesh(cupGeometry, ceramic, x, 0.58, -0.04, parent);
+  }
   return undefined;
 };
 
 const buildDisplayCase: ObjectBuilder = (kit, parent) => {
-  const glass = kit.material({
-    color: 0xcfe4ec, roughness: 0.1, metalness: 0.1,
-    transparent: true, opacity: 0.35,
-  });
-  const base = kit.material({ color: 0x4a3a28, roughness: 0.8 });
-  const pastry = kit.material({ color: 0xc4924a, roughness: 0.8 });
-  kit.box(base, 0, 0.06, 0, 0.7, 0.12, 0.5, false, parent);
-  kit.box(glass, 0, 0.36, 0, 0.7, 0.48, 0.5, false, parent);
-  const bunGeometry = kit.track(new THREE.SphereGeometry(0.07, 10, 8));
+  const glass = finish.glass(0xcfe4ec);
+  const base = finish.wood(0x4a3a28);
+  const croissant = finish.fabric(0xc4924a);
+  const muffin = finish.fabric(0x8a5a32);
+  const paper = finish.ceramic(0xe8e4d8);
+  rbox(kit, base, 0, 0.06, 0, 0.72, 0.12, 0.52, parent, 0.02);
+  kit.box(glass, 0, 0.37, 0, 0.7, 0.5, 0.5, false, parent);
+  kit.box(base, 0, 0.33, 0, 0.66, 0.025, 0.46, false, parent); // shelf
+  // Bottom row: croissants (squashed spheres); top shelf: muffins.
+  const croissantGeometry = kit.track(new THREE.SphereGeometry(0.07, 10, 8));
   for (const x of [-0.2, 0, 0.2]) {
-    kit.mesh(bunGeometry, pastry, x, 0.2, 0, parent);
+    const pastry = kit.mesh(croissantGeometry, croissant, x, 0.17, 0.05, parent);
+    pastry.scale.set(1.2, 0.62, 0.85);
+  }
+  const muffinBase = kit.track(new THREE.CylinderGeometry(0.045, 0.035, 0.05, 10));
+  const muffinTop = kit.track(new THREE.SphereGeometry(0.05, 10, 8));
+  for (const x of [-0.15, 0.08]) {
+    kit.mesh(muffinBase, paper, x, 0.37, 0, parent);
+    const dome = kit.mesh(muffinTop, muffin, x, 0.41, 0, parent);
+    dome.scale.y = 0.7;
   }
   return undefined;
 };
 
 const buildBoard: ObjectBuilder = (kit, parent, entity) => {
-  const frame = kit.material({ color: 0x5d4023, roughness: 0.8 });
-  kit.box(frame, 0, 0, 0, 1.5, 0.95, 0.06, false, parent);
+  const frame = finish.wood(0x5d4023);
+  kit.box(frame, 0, 0, 0, 1.5, 0.95, 0.05, false, parent); // backing
+  // Mitred frame strips and a chalk ledge.
+  for (const y of [-0.475, 0.475]) {
+    rbox(kit, frame, 0, y, 0.01, 1.56, 0.07, 0.07, parent, 0.018);
+  }
+  for (const x of [-0.745, 0.745]) {
+    rbox(kit, frame, x, 0, 0.01, 0.07, 0.95, 0.07, parent, 0.018);
+  }
+  rbox(kit, frame, 0, -0.54, 0.06, 1.0, 0.04, 0.12, parent, 0.012); // chalk ledge
+  const title = entity.descriptor.split(" — ")[0].toUpperCase();
+  const isMenu = /menu|caf|coffee/.test(entity.descriptor.toLowerCase());
   canvasPlane(
-    kit, parent,
+    kit, parent, `board:${title}:${isMenu}`,
     (ctx) => {
       ctx.fillStyle = "#22301f";
-      ctx.fillRect(0, 0, 512, 320);
+      ctx.fillRect(0, 0, 1024, 640);
       ctx.fillStyle = "#e8e4d2";
-      ctx.font = "bold 56px serif";
       ctx.textAlign = "center";
-      const title = entity.descriptor.split(" — ")[0].toUpperCase();
-      ctx.fillText(title.slice(0, 18), 256, 78);
+      fitText(ctx, title, 860, "bold {size}px Georgia, 'Times New Roman', serif", 96);
+      ctx.fillText(title, 512, 122);
       ctx.strokeStyle = "#cdc8b4";
-      ctx.lineWidth = 5;
-      for (let y = 130; y <= 270; y += 46) {
-        ctx.beginPath();
-        ctx.moveTo(70, y);
-        ctx.lineTo(330 + (y % 92), y);
-        ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(120, 158);
+      ctx.lineTo(904, 158);
+      ctx.stroke();
+      if (isMenu) {
+        // Readable chalk menu: items left, prices right.
+        const items: [string, string][] = [
+          ["Espresso", "2.50"],
+          ["Flat White", "3.80"],
+          ["Croissant", "3.20"],
+          ["Muffin", "2.80"],
+        ];
+        ctx.font = "52px Georgia, 'Times New Roman', serif";
+        items.forEach(([item, price], i) => {
+          const y = 250 + i * 92;
+          ctx.textAlign = "left";
+          ctx.fillText(item, 120, y);
+          ctx.textAlign = "right";
+          ctx.fillText(price, 800, y);
+        });
+      } else {
+        ctx.lineWidth = 8;
+        for (let y = 250; y <= 540; y += 92) {
+          ctx.beginPath();
+          ctx.moveTo(120, y);
+          ctx.lineTo(620 + (y % 184), y);
+          ctx.stroke();
+        }
       }
       // The doodle of a coffee cup.
-      ctx.strokeRect(404, 180, 60, 70);
+      ctx.strokeStyle = "#e8e4d2";
+      ctx.lineWidth = 7;
+      ctx.strokeRect(852, 380, 96, 120);
       ctx.beginPath();
-      ctx.arc(470, 215, 18, -Math.PI / 2, Math.PI / 2);
+      ctx.arc(958, 440, 30, -Math.PI / 2, Math.PI / 2);
+      ctx.stroke();
+      ctx.beginPath(); // steam
+      ctx.moveTo(880, 350);
+      ctx.bezierCurveTo(870, 320, 900, 310, 892, 282);
       ctx.stroke();
     },
-    512, 320, 1.36, 0.82, 0, 0, 0.035,
+    1024, 640, 1.36, 0.82, 0, 0, 0.035,
   );
   return undefined;
 };
 
 const buildTable: ObjectBuilder = (kit, parent, entity) => {
-  const wood = woodOf(kit, entity);
+  const wood = woodMaterial(colorFromText(entity.descriptor, entity.id));
   if (/round/.test(entity.descriptor.toLowerCase())) {
-    const topGeometry = kit.track(new THREE.CylinderGeometry(0.48, 0.48, 0.06, 20));
-    kit.mesh(topGeometry, wood, 0, 0.71, 0, parent);
-    const stemGeometry = kit.track(new THREE.CylinderGeometry(0.05, 0.05, 0.68, 10));
-    kit.mesh(stemGeometry, wood, 0, 0.35, 0, parent);
-    const footGeometry = kit.track(new THREE.CylinderGeometry(0.26, 0.3, 0.05, 16));
-    kit.mesh(footGeometry, wood, 0, 0.03, 0, parent);
+    // Café pedestal table: top with a rim, stem, weighted foot.
+    kit.mesh(kit.track(new THREE.CylinderGeometry(0.48, 0.48, 0.05, 24)), wood, 0, 0.715, 0, parent);
+    kit.mesh(
+      kit.track(new THREE.TorusGeometry(0.47, 0.022, 8, 28).rotateX(Math.PI / 2)),
+      wood, 0, 0.7, 0, parent,
+    );
+    kit.mesh(kit.track(new THREE.CylinderGeometry(0.045, 0.05, 0.66, 10)), wood, 0, 0.36, 0, parent);
+    kit.mesh(kit.track(new THREE.CylinderGeometry(0.24, 0.3, 0.06, 18)), wood, 0, 0.03, 0, parent);
   } else {
-    kit.box(wood, 0, 0.71, 0, 0.9, 0.06, 0.9, false, parent);
-    for (const [x, z] of [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]]) {
-      kit.box(wood, x, 0.34, z, 0.07, 0.68, 0.07, false, parent);
+    rbox(kit, wood, 0, 0.71, 0, 0.9, 0.06, 0.9, parent, 0.02);
+    const legGeometry = kit.track(new THREE.CylinderGeometry(0.03, 0.035, 0.68, 8));
+    for (const [x, z] of [[-0.38, -0.38], [0.38, -0.38], [-0.38, 0.38], [0.38, 0.38]]) {
+      kit.mesh(legGeometry, wood, x, 0.34, z, parent);
     }
   }
   return undefined;
 };
 
+const buildChair: ObjectBuilder = (kit, parent, entity) => {
+  const wood = woodOf(entity);
+  const legGeometry = kit.track(new THREE.CylinderGeometry(0.022, 0.028, 0.46, 8));
+  for (const [x, z] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) {
+    kit.mesh(legGeometry, wood, x, 0.23, z, parent);
+  }
+  rbox(kit, wood, 0, 0.48, 0, 0.44, 0.05, 0.44, parent, 0.02); // seat
+  for (const x of [-0.19, 0.19]) {
+    kit.box(wood, x, 0.76, -0.2, 0.045, 0.56, 0.045, false, parent); // back posts
+  }
+  rbox(kit, wood, 0, 0.95, -0.2, 0.44, 0.16, 0.04, parent, 0.015); // back rest
+  return undefined;
+};
+
+const buildLamp: ObjectBuilder = (kit, parent) => {
+  const metal = finish.iron(0x4a4d52);
+  const shade = finish.fabric(0xe8dcc0);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.14, 0.17, 0.04, 14)), metal, 0, 0.02, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.018, 0.022, 1.15, 8)), metal, 0, 0.6, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.12, 0.22, 0.26, 14, 1, true)), shade, 0, 1.28, 0, parent);
+  return undefined;
+};
+
+// A closed umbrella for the stand: folded canopy, ferrule down, hook up.
+const buildClosedUmbrella = (kit: Kit, parent: THREE.Group, tint: number) => {
+  const metal = finish.iron(0x4a4d52);
+  const canopy = finish.fabric(tint);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.012, 0.012, 0.25, 6)), metal, 0, 0.12, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.065, 0.018, 0.6, 10)), canopy, 0, 0.54, 0, parent);
+  const hookGeometry = kit.track(new THREE.TorusGeometry(0.05, 0.014, 6, 12, Math.PI));
+  kit.mesh(hookGeometry, metal, 0.05, 0.86, 0, parent);
+};
+
+// An open umbrella: canopy cone with rib tips over a straight pole.
 const buildUmbrella = (kit: Kit, parent: THREE.Group, tint: number, scale = 1) => {
-  const pole = kit.material({ color: 0x4a4d52, metalness: 0.3, roughness: 0.6 });
-  const canopy = kit.material({ color: tint, roughness: 0.8 });
-  const poleGeometry = kit.track(new THREE.CylinderGeometry(0.02 * scale, 0.02 * scale, 0.9 * scale, 8));
-  kit.mesh(poleGeometry, pole, 0, 0.45 * scale, 0, parent);
-  const coneGeometry = kit.track(new THREE.ConeGeometry(0.32 * scale, 0.22 * scale, 12));
-  kit.mesh(coneGeometry, canopy, 0, 0.85 * scale, 0, parent);
+  const metal = finish.iron(0x4a4d52);
+  const canopy = finish.fabric(tint);
+  kit.mesh(
+    kit.track(new THREE.CylinderGeometry(0.02 * scale, 0.02 * scale, 0.95 * scale, 8)),
+    metal, 0, 0.47 * scale, 0, parent,
+  );
+  kit.mesh(
+    kit.track(new THREE.ConeGeometry(0.34 * scale, 0.2 * scale, 10)),
+    canopy, 0, 0.88 * scale, 0, parent,
+  );
+  kit.mesh(
+    kit.track(new THREE.CylinderGeometry(0.006, 0.012, 0.08, 6)),
+    metal, 0, 1.02 * scale, 0, parent,
+  );
 };
 
 const buildUmbrellaStand: ObjectBuilder = (kit, parent, entity) => {
-  const metal = kit.material({ color: 0x6a6f76, metalness: 0.6, roughness: 0.4 });
-  const bucketGeometry = kit.track(new THREE.CylinderGeometry(0.24, 0.2, 0.5, 14));
-  kit.mesh(bucketGeometry, metal, 0, 0.25, 0, parent);
-  const lean = new THREE.Group();
-  lean.position.y = 0.1;
-  parent.add(lean);
-  buildUmbrella(kit, lean, 0x2c3e63, 0.85);
-  const second = new THREE.Group();
-  second.position.set(0.1, 0.1, 0.05);
-  second.rotation.z = 0.18;
-  parent.add(second);
-  buildUmbrella(kit, second, colorFromText("", entity.id), 0.8);
+  const metal = finish.metal(0x6a6f76);
+  const inner = finish.plastic(0x2b2e33);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.24, 0.19, 0.5, 16)), metal, 0, 0.25, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.21, 0.21, 0.03, 16)), inner, 0, 0.5, 0, parent);
+  // A crowd of dripping umbrellas leaning at different angles.
+  const tints = [0x2c3e63, colorFromText("", entity.id), 0x3f7a44];
+  tints.forEach((tint, i) => {
+    const lean = new THREE.Group();
+    lean.position.set(-0.08 + i * 0.08, 0.16, (i % 2) * 0.08 - 0.04);
+    lean.rotation.z = -0.16 + i * 0.16;
+    lean.rotation.x = (i % 2) * 0.12 - 0.06;
+    parent.add(lean);
+    buildClosedUmbrella(kit, lean, tint);
+  });
   return undefined;
 };
 
 const buildShelter: ObjectBuilder = (kit, parent) => {
-  const glass = kit.material({
-    color: 0xd2e4ec, roughness: 0.08, metalness: 0.1,
-    transparent: true, opacity: 0.28,
-  });
-  const steel = kit.material({ color: 0x4a4d52, metalness: 0.5, roughness: 0.5 });
+  const glass = finish.glass(0xd2e4ec);
+  const steel = finish.iron(0x4a4d52);
   kit.box(glass, 0, 1.1, -0.55, 2.6, 1.9, 0.05, false, parent); // back panel
   for (const x of [-1.3, 1.3]) {
-    kit.box(glass, x, 1.1, 0, 0.05, 1.9, 1.1, false, parent);
-    kit.box(steel, x, 1.1, -0.55, 0.08, 2.2, 0.08, false, parent);
+    kit.box(glass, x, 1.1, 0, 0.05, 1.9, 1.1, false, parent); // side panels
+    for (const z of [-0.55, 0.5]) {
+      kit.box(steel, x, 1.1, z, 0.08, 2.2, 0.08, false, parent); // posts
+    }
   }
-  kit.box(steel, 0, 2.24, 0, 2.9, 0.08, 1.4, false, parent); // roof
+  rbox(kit, steel, 0, 2.24, 0, 2.9, 0.08, 1.4, parent, 0.025); // roof
+  rbox(kit, steel, 0, 2.18, 0.71, 2.9, 0.14, 0.04, parent, 0.015); // fascia
   canvasPlane(
-    kit, parent,
+    kit, parent, "route-map",
     (ctx) => {
       ctx.fillStyle = "#e8e4d8";
-      ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = "#2c3e63";
-      ctx.lineWidth = 6;
-      ctx.strokeRect(8, 8, 240, 240);
+      ctx.fillRect(0, 0, 512, 512);
       ctx.fillStyle = "#2c3e63";
-      ctx.font = "bold 34px sans-serif";
+      ctx.fillRect(0, 0, 512, 96); // header band
+      ctx.fillStyle = "#f1f5f9";
+      ctx.font = "bold 56px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("ROUTE MAP", 128, 52);
+      ctx.fillText("ROUTE MAP", 256, 66);
+      ctx.strokeStyle = "#2c3e63";
+      ctx.lineWidth = 8;
+      ctx.strokeRect(10, 10, 492, 492);
+      // The line and its stops.
+      ctx.lineWidth = 10;
       ctx.beginPath();
-      ctx.moveTo(36, 200); ctx.lineTo(110, 120); ctx.lineTo(220, 150);
+      ctx.moveTo(70, 420);
+      ctx.lineTo(210, 250);
+      ctx.lineTo(430, 310);
       ctx.stroke();
-      for (const [x, y] of [[36, 200], [110, 120], [220, 150]]) {
+      ctx.font = "500 30px system-ui, sans-serif";
+      const stops: [number, number, string][] = [
+        [70, 420, "Depot"],
+        [210, 250, "Centre"],
+        [430, 310, "Harbour"],
+      ];
+      for (const [x, y, label] of stops) {
+        ctx.fillStyle = "#2c3e63";
         ctx.beginPath();
-        ctx.arc(x, y, 9, 0, Math.PI * 2);
+        ctx.arc(x, y, 16, 0, Math.PI * 2);
         ctx.fill();
+        ctx.fillStyle = "#f8fafc";
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#2c3e63";
+        ctx.fillText(label, x, y - 28);
       }
     },
-    256, 256, 0.7, 0.7, 0.6, 1.3, -0.51,
+    512, 512, 0.7, 0.7, 0.6, 1.3, -0.51,
   );
   return undefined;
 };
 
 const buildSign: ObjectBuilder = (kit, parent, entity) => {
-  const steel = kit.material({ color: 0x4a4d52, metalness: 0.5, roughness: 0.5 });
-  const poleGeometry = kit.track(new THREE.CylinderGeometry(0.035, 0.035, 2.4, 10));
-  kit.mesh(poleGeometry, steel, 0, 1.2, 0, parent);
+  const steel = finish.iron(0x4a4d52);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.14, 0.17, 0.05, 14)), steel, 0, 0.025, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.035, 0.035, 2.4, 10)), steel, 0, 1.2, 0, parent);
   const routeNumber = /\d+/.exec(entity.descriptor)?.[0] ?? "BUS";
+  kit.box(steel, 0, 2.15, 0.02, 0.6, 0.46, 0.03, false, parent); // panel backing
   canvasPlane(
-    kit, parent,
+    kit, parent, `sign:${routeNumber}`,
     (ctx) => {
       ctx.fillStyle = "#2c3e63";
-      ctx.fillRect(0, 0, 256, 192);
+      ctx.fillRect(0, 0, 512, 384);
       ctx.strokeStyle = "#f1f5f9";
-      ctx.lineWidth = 8;
-      ctx.strokeRect(8, 8, 240, 176);
+      ctx.lineWidth = 12;
+      ctx.strokeRect(16, 16, 480, 352);
       ctx.fillStyle = "#f1f5f9";
       ctx.textAlign = "center";
-      ctx.font = "bold 40px sans-serif";
-      ctx.fillText("BUS STOP", 128, 70);
-      ctx.font = "bold 72px sans-serif";
-      ctx.fillText(routeNumber, 128, 155);
+      ctx.font = "bold 76px system-ui, sans-serif";
+      ctx.fillText("BUS STOP", 256, 130);
+      ctx.strokeStyle = "#f1f5f9";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(96, 168);
+      ctx.lineTo(416, 168);
+      ctx.stroke();
+      fitText(ctx, routeNumber, 400, "bold {size}px system-ui, sans-serif", 150);
+      ctx.fillText(routeNumber, 256, 312);
     },
-    256, 192, 0.56, 0.42, 0, 2.15, 0.04,
+    512, 384, 0.56, 0.42, 0, 2.15, 0.04,
   );
   return undefined;
 };
 
 const buildBriefcase: ObjectBuilder = (kit, parent) => {
-  const leather = kit.material({ color: 0x5d3a1e, roughness: 0.6 });
-  const body = kit.box(leather, 0, 0.16, 0, 0.42, 0.3, 0.12, false, parent);
+  const leather = finish.wood(0x5d3a1e); // matte leather
+  const brass = finish.metal(0xb08d3a);
+  const body = rbox(kit, leather, 0, 0.16, 0, 0.42, 0.3, 0.13, parent, 0.03);
   body.rotation.x = -0.06;
-  kit.box(leather, 0, 0.345, 0, 0.14, 0.05, 0.04, false, parent); // handle
-  const cloth = kit.material({ color: 0x6a7076, roughness: 0.95 });
-  const jacket = kit.box(cloth, 0.42, 0.06, 0, 0.34, 0.1, 0.26, false, parent);
+  const handleGeometry = kit.track(new THREE.TorusGeometry(0.06, 0.014, 8, 14, Math.PI));
+  kit.mesh(handleGeometry, leather, 0, 0.32, 0, parent);
+  for (const x of [-0.11, 0.11]) {
+    rbox(kit, brass, x, 0.255, 0.065, 0.045, 0.03, 0.02, parent, 0.008); // clasps
+  }
+  // The folded jacket left beside it.
+  const cloth = finish.fabric(0x6a7076);
+  const jacket = rbox(kit, cloth, 0.42, 0.05, 0, 0.34, 0.09, 0.26, parent, 0.025);
   jacket.rotation.y = 0.4;
+  const fold = rbox(kit, cloth, 0.4, 0.11, 0.01, 0.24, 0.05, 0.18, parent, 0.02);
+  fold.rotation.y = 0.55;
   return undefined;
 };
 
 const buildCup: ObjectBuilder = (kit, parent) => {
-  const ceramic = kit.material({ color: 0xe8e4d8, roughness: 0.5 });
-  const cupGeometry = kit.track(new THREE.CylinderGeometry(0.06, 0.045, 0.12, 12));
-  kit.mesh(cupGeometry, ceramic, 0, 0.06, 0, parent);
+  const ceramic = finish.ceramic(0xe8e4d8);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.055, 0.042, 0.115, 14)), ceramic, 0, 0.058, 0, parent);
+  const handleGeometry = kit.track(new THREE.TorusGeometry(0.035, 0.01, 6, 12, Math.PI));
+  const handle = kit.mesh(handleGeometry, ceramic, 0.062, 0.06, 0, parent);
+  handle.rotation.z = -Math.PI / 2;
   return undefined;
 };
 
 const buildPlant: ObjectBuilder = (kit, parent) => {
-  const clay = kit.material({ color: 0xa05a37, roughness: 0.85 });
-  const leaves = kit.material({ color: 0x3a6b35, roughness: 0.9 });
-  const potGeometry = kit.track(new THREE.CylinderGeometry(0.16, 0.12, 0.24, 12));
-  kit.mesh(potGeometry, clay, 0, 0.12, 0, parent);
-  const bushGeometry = kit.track(new THREE.SphereGeometry(0.22, 12, 9));
-  kit.mesh(bushGeometry, leaves, 0, 0.42, 0, parent);
+  const clay = finish.stone(0xa05a37);
+  const leafDark = foliageMaterial(0x3a6b35);
+  const leafLight = foliageMaterial(0x4c7e3e);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.16, 0.115, 0.24, 14)), clay, 0, 0.12, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.17, 0.17, 0.045, 14)), clay, 0, 0.245, 0, parent); // rim
+  const bushGeometry = kit.track(new THREE.SphereGeometry(0.16, 10, 8));
+  for (const [x, y, z, leaf] of [
+    [0, 0.43, 0, leafDark],
+    [0.1, 0.52, 0.05, leafLight],
+    [-0.1, 0.5, -0.04, leafDark],
+  ] as const) {
+    kit.mesh(bushGeometry, leaf as THREE.Material, x as number, y as number, z as number, parent);
+  }
   return undefined;
 };
 
 const buildScreen: ObjectBuilder = (kit, parent) => {
-  const dark = kit.material({ color: 0x1b1e24, roughness: 0.4 });
-  kit.box(dark, 0, 0.85, 0, 1.2, 0.7, 0.06, false, parent);
-  kit.box(dark, 0, 0.25, 0, 0.1, 0.5, 0.1, false, parent);
-  kit.box(dark, 0, 0.02, 0, 0.5, 0.04, 0.3, false, parent);
+  const dark = finish.plastic(0x1b1e24);
+  const panel = finish.ceramic(0x2e3440);
+  rbox(kit, dark, 0, 0.85, 0, 1.2, 0.7, 0.05, parent, 0.02); // bezel
+  kit.box(panel, 0, 0.85, 0.028, 1.1, 0.6, 0.01, false, parent); // panel face
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.04, 0.05, 0.46, 8)), dark, 0, 0.27, 0, parent);
+  rbox(kit, dark, 0, 0.025, 0, 0.5, 0.05, 0.3, parent, 0.015); // base
   return undefined;
 };
 
 const buildShelf: ObjectBuilder = (kit, parent, entity) => {
-  const wood = woodOf(kit, entity);
+  const wood = woodOf(entity);
   for (const x of [-0.55, 0.55]) {
-    kit.box(wood, x, 0.8, 0, 0.06, 1.6, 0.32, false, parent);
+    rbox(kit, wood, x, 0.8, 0, 0.06, 1.6, 0.32, parent, 0.015);
   }
   for (const y of [0.3, 0.8, 1.3]) {
-    kit.box(wood, 0, y, 0, 1.16, 0.05, 0.32, false, parent);
+    rbox(kit, wood, 0, y, 0, 1.16, 0.05, 0.32, parent, 0.012);
   }
   return undefined;
 };
@@ -694,6 +732,8 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/espresso|machine/, buildMachine],
   [/pastry|display case|glass case/, buildDisplayCase],
   [/menu|chalkboard|board|sign/, buildBoard],
+  [/chair|stool/, buildChair],
+  [/lamp/, buildLamp],
   [/table|desk/, buildTable],
   [/briefcase|suitcase/, buildBriefcase],
   [/cup|mug|latte/, buildCup],
@@ -705,29 +745,34 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Mandatory fallback: a scene must never fail to render.
+// Mandatory fallback: a scene must never fail to render. Unmapped
+// descriptors become a clean rounded block with a labeled plaque.
 // ---------------------------------------------------------------------------
 
 function buildPlaceholder(kit: Kit, parent: THREE.Group, entity: PlacedEntity): undefined {
-  const tint = kit.material({
+  const tint = sharedMaterial({
     color: colorFromText(entity.descriptor, entity.id),
     roughness: 0.8,
   });
-  kit.box(tint, 0, 0.4, 0, 0.7, 0.8, 0.7, false, parent);
+  rbox(kit, tint, 0, 0.4, 0, 0.66, 0.8, 0.66, parent, 0.05);
+  const label = entity.descriptor.slice(0, 48);
   canvasPlane(
-    kit, parent,
+    kit, parent, `placeholder:${label}`,
     (ctx) => {
-      ctx.fillStyle = "#10141f";
-      ctx.fillRect(0, 0, 512, 96);
-      ctx.strokeStyle = "#ffd23f";
-      ctx.lineWidth = 5;
-      ctx.strokeRect(4, 4, 504, 88);
+      ctx.clearRect(0, 0, 512, 96);
+      ctx.fillStyle = "rgba(16, 20, 31, 0.92)";
+      ctx.beginPath();
+      ctx.roundRect(6, 6, 500, 84, 18);
+      ctx.fill();
+      ctx.strokeStyle = "#8a93a8";
+      ctx.lineWidth = 3;
+      ctx.stroke();
       ctx.fillStyle = "#f1f5f9";
-      ctx.font = "26px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(entity.descriptor.slice(0, 38), 256, 58);
+      fitText(ctx, label, 460, "500 {size}px system-ui, sans-serif", 30);
+      ctx.fillText(label, 256, 58);
     },
-    512, 96, 1.8, 0.34, 0, 1.05, 0,
+    512, 96, 1.6, 0.3, 0, 1.05, 0, 0, true,
   );
   return undefined;
 }
@@ -759,7 +804,7 @@ export function buildSceneMeshes(entities: PlacedEntity[]): BuiltScene {
       }
       group.scale.setScalar(anomalyScale(entity.descriptor));
     } else if (entity.kind === "person") {
-      update = buildPerson(kit, group, entity);
+      update = buildPerson(kit, group, entity).update;
     } else {
       const text = entity.descriptor.toLowerCase();
       const builder = OBJECT_BUILDERS.find(([pattern]) => pattern.test(text));
@@ -769,8 +814,36 @@ export function buildSceneMeshes(entities: PlacedEntity[]): BuiltScene {
         fallbacks.push(entity.descriptor);
         update = buildPlaceholder(kit, group, entity);
       }
+      // Slight seeded yaw/scale variation so repeated props are never
+      // copy-pasted clones.
+      group.rotation.y += (hash01(`${entity.id}:vyaw`) * 2 - 1) * 0.07;
+      group.scale.multiplyScalar(0.97 + hash01(`${entity.id}:vscale`) * 0.06);
     }
     if (update) updates.push(update);
+
+    // Ground contact: builders aim feet/bases at y=0, but poses, scales,
+    // and stacked spheres can leave an entity hovering or sunk. Clamp
+    // ground-level entities so their lowest point rests on the floor;
+    // stacked placements ("on the bench", "above the counter") keep the
+    // height the compiler gave them.
+    if (y < 0.05) {
+      const bounds = new THREE.Box3().setFromObject(group);
+      if (!bounds.isEmpty() && Math.abs(bounds.min.y) > 0.02) {
+        group.position.y -= bounds.min.y;
+      }
+    }
+
+    // Soft contact blob under props and creatures (people get real shadow
+    // detail from their many parts; wall-mounted boards float on purpose).
+    if (entity.kind !== "person" && entity.transform.position[1] < 1) {
+      const bounds = new THREE.Box3().setFromObject(group);
+      const size = bounds.getSize(new THREE.Vector3());
+      contactShadow(
+        group,
+        Math.max(0.22, (size.x / group.scale.x) * 0.6),
+        Math.max(0.22, (size.z / group.scale.z) * 0.6),
+      );
+    }
 
     // Tag every mesh so raycasts can recover the manifest id later.
     group.traverse((child) => {
