@@ -31,14 +31,24 @@ export const LATERAL = { left: -3.2, center: 0, right: 3.2 } as const;
 const ABSOLUTE_JITTER = 0.4;
 const RELATIONAL_JITTER = 0.15;
 const PERSON_YAW_JITTER = 0.4;
-// Placeholder entity height for "on/above" stacking until real meshes
-// report their own bounds.
-const ANCHOR_HEIGHT = 1.0;
 const DEPTH_OFFSET = 1.2;
 const BESIDE_OFFSET = 1.5;
 const ON_LATERAL_NUDGE = 0.8;
+// "above" floats clear of the anchor's top (wall-mounted boards etc.).
+const ABOVE_CLEARANCE = 0.7;
 
-type RelationKind = "behind" | "in_front_of" | "beside" | "on" | "under";
+/** Approximate top-surface height an entity offers for "on" stacking.
+ *  The mesh factory builds its primitives to match these. */
+export function surfaceHeightFor(descriptor: string): number {
+  const text = descriptor.toLowerCase();
+  if (/counter|machine|case|fridge/.test(text)) return 0.95;
+  if (/bench|chair|seat|stool/.test(text)) return 0.5;
+  if (/table|desk/.test(text)) return 0.74;
+  if (/shelter|tree|roof/.test(text)) return 2.2;
+  return 0.8;
+}
+
+type RelationKind = "behind" | "in_front_of" | "beside" | "on" | "above" | "under";
 
 // Priority order: multi-word phrases first so "in front of" never matches
 // as a bare "on". "inside" shares "under"'s placement (at the anchor's
@@ -49,7 +59,7 @@ const RELATIONS: { keyword: string; kind: RelationKind }[] = [
   { keyword: "next to", kind: "beside" },
   { keyword: "beside", kind: "beside" },
   { keyword: "near", kind: "beside" },
-  { keyword: "above", kind: "on" },
+  { keyword: "above", kind: "above" },
   { keyword: "on", kind: "on" },
   { keyword: "under", kind: "under" },
   { keyword: "inside", kind: "under" },
@@ -77,8 +87,9 @@ function tokenize(text: string): string[] {
   return text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 }
 
-// Deterministic FNV-1a string hash mapped to [0, 1).
-function hash01(seed: string): number {
+// Deterministic FNV-1a string hash mapped to [0, 1). Shared with the mesh
+// factory for seeded tints.
+export function hash01(seed: string): number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
@@ -175,10 +186,12 @@ function relationalTransform(
   entry: CompileEntry,
   kind: RelationKind,
   anchor: PlacedTransform,
+  anchorDescriptor: string,
 ): PlacedTransform {
   const [ax, ay, az] = anchor.position;
   const jx = jitter(entry.id, "x", RELATIONAL_JITTER);
   const jz = jitter(entry.id, "z", RELATIONAL_JITTER);
+  const surface = ay + surfaceHeightFor(anchorDescriptor);
   let position: [number, number, number];
   switch (kind) {
     case "behind":
@@ -197,7 +210,14 @@ function relationalTransform(
     case "on":
       position = [
         ax + explicitSide(entry.position) * ON_LATERAL_NUDGE + jx,
-        ay + ANCHOR_HEIGHT,
+        surface,
+        az + jz,
+      ];
+      break;
+    case "above":
+      position = [
+        ax + explicitSide(entry.position) * ON_LATERAL_NUDGE + jx,
+        surface + ABOVE_CLEARANCE,
         az + jz,
       ];
       break;
@@ -221,7 +241,9 @@ export function compileScene(scene: SceneSpec): PlacedEntity[] {
     ...scene.objects.map((object) => ({
       id: object.id,
       isPerson: false,
-      descriptor: object.name,
+      // Detail rides along so the mesh factory can key off colors,
+      // numbers, and shape words ("round", "route number 42").
+      descriptor: `${object.name} — ${object.detail}`,
       action: undefined,
       position: object.position,
       tokens: new Set(tokenize(`${object.id} ${object.name} ${object.detail}`)),
@@ -230,6 +252,7 @@ export function compileScene(scene: SceneSpec): PlacedEntity[] {
 
   // Pass 1: absolute positions. Entities whose position resolves to a
   // relation against another entity wait for pass 2.
+  const entryById = new Map(entries.map((entry) => [entry.id, entry]));
   const transforms = new Map<string, PlacedTransform>();
   const pending: { entry: CompileEntry; kind: RelationKind; targetId: string }[] = [];
   for (const entry of entries) {
@@ -250,7 +273,10 @@ export function compileScene(scene: SceneSpec): PlacedEntity[] {
       const { entry, kind, targetId } = pending[i];
       const anchor = transforms.get(targetId);
       if (!anchor) continue;
-      transforms.set(entry.id, relationalTransform(entry, kind, anchor));
+      transforms.set(
+        entry.id,
+        relationalTransform(entry, kind, anchor, entryById.get(targetId)!.descriptor),
+      );
       pending.splice(i, 1);
       progress = true;
     }

@@ -1,20 +1,27 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { buildDebugMarkers } from "./debug-markers";
-import type { PlacedEntity } from "./compile";
+import { compileScene } from "./compile";
+import { buildSceneMeshes, BuiltScene } from "./mesh-factory";
+import { buildEnvironment, EnvironmentBuild } from "./environment";
+import type { SceneSpec } from "./types";
+
+export interface SceneReport {
+  /** Descriptors that rendered as the placeholder fallback (asset gaps). */
+  fallbacks: string[];
+}
 
 export interface StageHandle {
-  /** Swaps the displayed entities; the stage itself persists. */
-  setScene(entities: PlacedEntity[]): void;
+  /** Compiles and displays a scene; the stage itself persists. */
+  setScene(scene: SceneSpec): SceneReport;
   dispose(): void;
 }
 
-// Stage for the "Describe the Scene" drill: lit ground plus whatever the
-// compiled scene places on it (Phase 2: debug markers only).
+// Stage for the "Describe the Scene" drill: renderer, clamped camera, and
+// lights whose color/intensity the per-scene environment retunes.
 export function createStageScene(container: HTMLElement): StageHandle {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x10121f);
-  scene.fog = new THREE.Fog(0x10121f, 18, 34);
+  scene.fog = new THREE.Fog(0x10121f, 20, 38);
 
   const camera = new THREE.PerspectiveCamera(
     50,
@@ -22,7 +29,9 @@ export function createStageScene(container: HTMLElement): StageHandle {
     0.1,
     100,
   );
-  camera.position.set(0, 3.2, 9.5);
+  // Slightly above head height, far enough back that the foreground (z=4),
+  // midground (z=0), and background (z=-5) rows separate clearly.
+  camera.position.set(0, 3.6, 10);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(container.clientWidth, container.clientHeight);
@@ -31,7 +40,8 @@ export function createStageScene(container: HTMLElement): StageHandle {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xbfc8ff, 0.55));
+  const ambient = new THREE.AmbientLight(0xbfc8ff, 0.55);
+  scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xfff4e0, 1.4);
   sun.position.set(6, 12, 4);
   sun.castShadow = true;
@@ -42,41 +52,55 @@ export function createStageScene(container: HTMLElement): StageHandle {
   sun.shadow.camera.bottom = -16;
   scene.add(sun);
 
-  const groundGeometry = new THREE.CircleGeometry(14, 64).rotateX(-Math.PI / 2);
-  const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2a3142,
-    roughness: 0.95,
-  });
-  const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-  ground.receiveShadow = true;
-  scene.add(ground);
-
   // Viewers may nudge the camera slightly to peek around, but the framing
   // stays fixed — no fly-around, pan, or big zooms.
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 1, 0);
+  controls.target.set(0, 0.9, 0);
   controls.enableDamping = true;
   controls.enablePan = false;
-  controls.minDistance = 8.5;
-  controls.maxDistance = 11;
+  controls.minDistance = 9.5;
+  controls.maxDistance = 11.5;
   controls.minAzimuthAngle = -0.2;
   controls.maxAzimuthAngle = 0.2;
-  controls.minPolarAngle = 1.25;
-  controls.maxPolarAngle = 1.42;
+  controls.minPolarAngle = 1.22;
+  controls.maxPolarAngle = 1.38;
 
-  let markers: { group: THREE.Group; dispose: () => void } | null = null;
-  const setScene = (entities: PlacedEntity[]) => {
-    if (markers) {
-      scene.remove(markers.group);
-      markers.dispose();
+  let content: BuiltScene | null = null;
+  let environment: EnvironmentBuild | null = null;
+
+  const setScene = (spec: SceneSpec): SceneReport => {
+    if (content) {
+      scene.remove(content.group);
+      content.dispose();
     }
-    markers = buildDebugMarkers(entities);
-    scene.add(markers.group);
+    if (environment) {
+      scene.remove(environment.group);
+      environment.dispose();
+    }
+
+    environment = buildEnvironment(spec.setting);
+    scene.add(environment.group);
+    const { lights } = environment;
+    sun.color.set(lights.sunColor);
+    sun.intensity = lights.sunIntensity;
+    sun.position.set(...lights.sunPosition);
+    ambient.color.set(lights.ambientColor);
+    ambient.intensity = lights.ambientIntensity;
+    (scene.background as THREE.Color).set(lights.background);
+    (scene.fog as THREE.Fog).color.set(lights.background);
+
+    content = buildSceneMeshes(compileScene(spec));
+    scene.add(content.group);
+    return { fallbacks: content.fallbacks };
   };
 
+  const clock = new THREE.Clock();
   let frame = 0;
   const animate = () => {
     frame = requestAnimationFrame(animate);
+    const elapsed = clock.getElapsedTime();
+    content?.update(elapsed);
+    environment?.update(elapsed);
     controls.update();
     renderer.render(scene, camera);
   };
@@ -95,9 +119,8 @@ export function createStageScene(container: HTMLElement): StageHandle {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
       controls.dispose();
-      markers?.dispose();
-      groundGeometry.dispose();
-      groundMaterial.dispose();
+      content?.dispose();
+      environment?.dispose();
       renderer.dispose();
       container.removeChild(renderer.domElement);
     },
