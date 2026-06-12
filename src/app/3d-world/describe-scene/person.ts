@@ -239,9 +239,18 @@ function foldSeated(
 ) {
   let seatTop = 0;
   if (!anchored) {
+    // A simple café chair: legs + seat + back, facing the way they face.
     seatTop = 0.5;
-    const seat = sharedMaterial({ color: 0x4a3a28, roughness: 0.9 });
-    kit.box(seat, 0, 0.24, -0.02, 0.5, 0.48, 0.5, false, parent);
+    const wood = sharedMaterial({ color: 0x4a3a28, roughness: 0.8 });
+    const legGeometry = kit.track(new THREE.CylinderGeometry(0.022, 0.028, 0.47, 8));
+    for (const [x, z] of [[-0.18, -0.16], [0.18, -0.16], [-0.18, 0.18], [0.18, 0.18]]) {
+      kit.mesh(legGeometry, wood, x, 0.235, z, parent);
+    }
+    kit.box(wood, 0, 0.49, 0, 0.46, 0.05, 0.46, false, parent); // seat
+    for (const x of [-0.19, 0.19]) {
+      kit.box(wood, x, 0.78, -0.21, 0.045, 0.62, 0.045, false, parent); // back posts
+    }
+    kit.box(wood, 0, 0.99, -0.21, 0.44, 0.16, 0.04, false, parent); // back rest
   }
   rig.pose.position.y = seatTop + 0.03 - HIP_Y * rig.heightScale;
   for (const [leg, splay] of [

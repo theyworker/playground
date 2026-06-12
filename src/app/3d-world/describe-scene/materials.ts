@@ -49,3 +49,25 @@ export function disposeSharedMaterials(): void {
   cache.forEach((material) => material.dispose());
   cache.clear();
 }
+
+// Finish recipes: a shared vocabulary of surface treatments so every prop
+// speaks the same material language. Builders say what a thing is made of,
+// not what numbers it has.
+export const finish = {
+  wood: (color: number) => sharedMaterial({ color, roughness: 0.8 }),
+  paint: (color: number) => sharedMaterial({ color, roughness: 0.65 }),
+  fabric: (color: number) => sharedMaterial({ color, roughness: 0.95 }),
+  stone: (color: number) => sharedMaterial({ color, roughness: 0.9 }),
+  ceramic: (color: number) => sharedMaterial({ color, roughness: 0.4 }),
+  plastic: (color: number) => sharedMaterial({ color, roughness: 0.55 }),
+  metal: (color: number) =>
+    sharedMaterial({ color, metalness: 0.8, roughness: 0.32 }),
+  iron: (color: number) =>
+    sharedMaterial({ color, metalness: 0.6, roughness: 0.55 }),
+  glass: (color: number) =>
+    sharedMaterial({
+      color, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.3,
+    }),
+  water: (color: number) =>
+    sharedMaterial({ color, roughness: 0.15, metalness: 0.05 }),
+} as const;
