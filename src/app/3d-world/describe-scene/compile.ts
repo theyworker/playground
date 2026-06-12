@@ -24,8 +24,14 @@ export interface PlacedEntity {
 }
 
 // Stage coordinate grid. The camera sits on +z looking toward -z, so
-// foreground is +z and rotationY 0 faces the camera.
-export const DEPTH = { foreground: 4, midground: 0, background: -5 } as const;
+// foreground is +z and rotationY 0 faces the camera. farBackground sits
+// inside the fog band so distant scenery visibly recedes.
+export const DEPTH = {
+  foreground: 4,
+  midground: 0,
+  background: -5,
+  farBackground: -9,
+} as const;
 export const LATERAL = { left: -3.2, center: 0, right: 3.2 } as const;
 
 const ABSOLUTE_JITTER = 0.4;
@@ -41,11 +47,23 @@ const ABOVE_CLEARANCE = 0.7;
  *  The mesh factory builds its primitives to match these. */
 export function surfaceHeightFor(descriptor: string): number {
   const text = descriptor.toLowerCase();
+  if (/path|trail|walkway|road/.test(text)) return 0; // flat on the ground
+  if (/blanket|mat\b|rug|towel/.test(text)) return 0.03;
   if (/counter|machine|case|fridge/.test(text)) return 0.95;
   if (/bench|chair|seat|stool/.test(text)) return 0.5;
   if (/table|desk/.test(text)) return 0.74;
   if (/shelter|tree|roof/.test(text)) return 2.2;
   return 0.8;
+}
+
+/** Extra radial clearance wide anchors need before beside/behind/in-front
+ *  offsets, so neighbours land outside their footprint (e.g. a dog "near
+ *  the pond" stands on the bank, not in the water). */
+function clearanceFor(descriptor: string): number {
+  const text = descriptor.toLowerCase();
+  if (/pond|lake|fountain/.test(text)) return 1.0;
+  if (/tree|oak/.test(text)) return 0.4;
+  return 0;
 }
 
 type RelationKind = "behind" | "in_front_of" | "beside" | "on" | "above" | "under";
@@ -63,6 +81,8 @@ const RELATIONS: { keyword: string; kind: RelationKind }[] = [
   { keyword: "on", kind: "on" },
   { keyword: "under", kind: "under" },
   { keyword: "inside", kind: "under" },
+  // "around" centers on the anchor; the builder spreads outward from there.
+  { keyword: "around", kind: "under" },
 ];
 
 // Words that never identify an anchor entity ("on the counter, left end").
@@ -111,10 +131,16 @@ export function parsePosition(position: string): {
   const text = position.toLowerCase();
   let depth: number = DEPTH.midground;
   if (text.includes("foreground")) depth = DEPTH.foreground;
-  else if (text.includes("background")) depth = DEPTH.background;
+  else if (/far background|in the distance|far away|horizon/.test(text)) {
+    depth = DEPTH.farBackground;
+  } else if (text.includes("background")) depth = DEPTH.background;
   let lateral: number = LATERAL.center;
   if (text.includes("left")) lateral = LATERAL.left;
   else if (text.includes("right")) lateral = LATERAL.right;
+  // The frustum widens with distance: spread far-background slots so
+  // distant scenery clears the regular background row instead of
+  // stacking behind it.
+  if (depth === DEPTH.farBackground) lateral *= 1.6;
   return { depth, lateral };
 }
 
@@ -192,19 +218,20 @@ function relationalTransform(
   const jx = jitter(entry.id, "x", RELATIONAL_JITTER);
   const jz = jitter(entry.id, "z", RELATIONAL_JITTER);
   const surface = ay + surfaceHeightFor(anchorDescriptor);
+  const clearance = clearanceFor(anchorDescriptor);
   let position: [number, number, number];
   switch (kind) {
     case "behind":
-      position = [ax + jx, 0, az - DEPTH_OFFSET + jz];
+      position = [ax + jx, 0, az - DEPTH_OFFSET - clearance + jz];
       break;
     case "in_front_of":
-      position = [ax + jx, 0, az + DEPTH_OFFSET + jz];
+      position = [ax + jx, 0, az + DEPTH_OFFSET + clearance + jz];
       break;
     case "beside": {
       const side =
         explicitSide(entry.position) ||
         (hash01(`${entry.id}:side`) < 0.5 ? -1 : 1);
-      position = [ax + side * BESIDE_OFFSET + jx, ay, az + jz];
+      position = [ax + side * (BESIDE_OFFSET + clearance) + jx, ay, az + jz];
       break;
     }
     case "on":
