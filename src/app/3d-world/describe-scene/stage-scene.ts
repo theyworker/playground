@@ -5,7 +5,11 @@ import { compileScene } from "./compile";
 import { buildSceneMeshes, BuiltScene } from "./mesh-factory";
 import { buildEnvironment, EnvironmentBuild } from "./environment";
 import { disposeSharedMaterials } from "./materials";
-import { disposeProceduralTextures, setTextureAnisotropy } from "./textures";
+import {
+  disposeProceduralTextures,
+  setTextureAnisotropy,
+  skyTexture,
+} from "./textures";
 import type { SceneSpec } from "./types";
 
 export interface SceneReport {
@@ -108,21 +112,30 @@ export function createStageScene(container: HTMLElement): StageHandle {
 
     environment = buildEnvironment(spec.setting);
     scene.add(environment.group);
-    const { lights } = environment;
-    sun.color.set(lights.sunColor);
-    sun.intensity = lights.sunIntensity;
-    sun.position.set(...lights.sunPosition);
-    hemi.color.set(lights.ambientColor);
-    hemi.groundColor.set(lights.groundColor);
-    hemi.intensity = lights.ambientIntensity;
+    const { palette } = environment;
+    sun.color.set(palette.sun);
+    sun.intensity = palette.sunIntensity;
+    sun.position.set(...palette.sunPosition);
+    hemi.color.set(palette.ambient);
+    hemi.groundColor.set(palette.groundBounce);
+    hemi.intensity = palette.ambientIntensity;
     // Fill mirrors the key on x at half height, tinted like the sky, and
     // scales with the key so the ratio holds across times of day.
-    fill.color.set(lights.ambientColor);
-    fill.intensity = lights.sunIntensity * 0.25;
-    fill.position.set(-lights.sunPosition[0], lights.sunPosition[1] * 0.5, 6);
-    scene.environmentIntensity = lights.envIntensity;
-    (scene.background as THREE.Color).set(lights.background);
-    (scene.fog as THREE.Fog).color.set(lights.background);
+    fill.color.set(palette.ambient);
+    fill.intensity = palette.sunIntensity * 0.25;
+    fill.position.set(-palette.sunPosition[0], palette.sunPosition[1] * 0.5, 6);
+    scene.environmentIntensity = palette.envIntensity;
+    // Gradient sky and depth fog tuned to the palette: the background row
+    // (z=-5) sits inside the haze, the foreground stays clean.
+    scene.background = skyTexture(
+      palette.skyTop,
+      palette.skyBottom,
+      palette.horizonGlow,
+    );
+    const fog = scene.fog as THREE.Fog;
+    fog.color.set(palette.fog);
+    fog.near = palette.fogNear;
+    fog.far = palette.fogFar;
 
     content = buildSceneMeshes(compileScene(spec));
     scene.add(content.group);

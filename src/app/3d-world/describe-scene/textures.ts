@@ -237,27 +237,146 @@ export function stripedMaterial(tint: number): THREE.MeshStandardMaterial {
   );
 }
 
-/** Grass / gravel speckle for the outdoor ground disc. */
-export function groundMaterial(tint: number): THREE.MeshStandardMaterial {
-  return surfaceMaterial(
-    `ground:${tint}`,
-    256, 256,
+/** Vertical gradient sky for scene.background; an optional glow color
+ *  blends a warm band into the horizon (golden hour). */
+export function skyTexture(
+  top: number,
+  bottom: number,
+  horizonGlow?: number,
+): THREE.CanvasTexture {
+  return proceduralTexture(
+    `sky:${top}:${bottom}:${horizonGlow ?? "none"}`,
+    64, 512,
     (ctx, w, h) => {
-      const base = new THREE.Color(tint);
-      ctx.fillStyle = hex(tint);
+      const gradient = ctx.createLinearGradient(0, 0, 0, h);
+      gradient.addColorStop(0, hex(top));
+      gradient.addColorStop(1, hex(bottom));
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, w, h);
-      const random = rng(`ground:${tint}`);
-      for (let i = 0; i < 900; i++) {
-        ctx.fillStyle = hex(
-          base.clone().multiplyScalar(0.75 + random() * 0.6).getHex(),
-        );
-        ctx.globalAlpha = 0.4;
-        ctx.fillRect(random() * w, random() * h, 1.5 + random() * 2, 1 + random() * 1.5);
+      if (horizonGlow !== undefined) {
+        const glow = new THREE.Color(horizonGlow);
+        const r = Math.round(glow.r * 255);
+        const g = Math.round(glow.g * 255);
+        const b = Math.round(glow.b * 255);
+        const band = ctx.createLinearGradient(0, h * 0.45, 0, h * 0.95);
+        band.addColorStop(0, `rgba(${r},${g},${b},0)`);
+        band.addColorStop(0.75, `rgba(${r},${g},${b},0.55)`);
+        band.addColorStop(1, `rgba(${r},${g},${b},0.15)`);
+        ctx.fillStyle = band;
+        ctx.fillRect(0, 0, w, h);
       }
-      ctx.globalAlpha = 1;
     },
-    { roughness: 0.95, repeat: [7, 7] },
   );
+}
+
+export type GroundKind = "grass" | "asphalt" | "sand" | "stone";
+
+/** Per-setting ground treatment: tinted color variation plus the same
+ *  texture reused as a bump map so the surface catches light unevenly. */
+export function groundSurface(
+  kind: GroundKind,
+  tint: number,
+): THREE.MeshStandardMaterial {
+  const key = `terrain:${kind}:${tint}`;
+  let material = materials.get(key);
+  if (!material) {
+    const texture = proceduralTexture(
+      key, 256, 256,
+      (ctx, w, h) => {
+        const base = new THREE.Color(tint);
+        const random = rng(key);
+        const shade = (factor: number) =>
+          hex(base.clone().multiplyScalar(factor).getHex());
+        ctx.fillStyle = hex(tint);
+        ctx.fillRect(0, 0, w, h);
+        if (kind === "grass") {
+          for (let i = 0; i < 700; i++) {
+            ctx.fillStyle = shade(0.75 + random() * 0.6);
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(random() * w, random() * h, 1.5 + random() * 2, 1 + random() * 1.5);
+          }
+          // Short blade strokes give the lawn a direction.
+          ctx.globalAlpha = 0.5;
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 160; i++) {
+            ctx.strokeStyle = shade(1.05 + random() * 0.35);
+            const x = random() * w;
+            const y = random() * h;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + (random() - 0.5) * 2, y - 3 - random() * 3);
+            ctx.stroke();
+          }
+        } else if (kind === "asphalt") {
+          // Fine aggregate plus a few hairline cracks.
+          for (let i = 0; i < 1400; i++) {
+            ctx.fillStyle = shade(0.7 + random() * 0.75);
+            ctx.globalAlpha = 0.35;
+            ctx.fillRect(random() * w, random() * h, 1 + random(), 1 + random());
+          }
+          ctx.globalAlpha = 0.35;
+          ctx.strokeStyle = shade(0.5);
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 4; i++) {
+            let x = random() * w;
+            let y = random() * h;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for (let step = 0; step < 5; step++) {
+              x += (random() - 0.5) * 30;
+              y += 8 + random() * 14;
+              ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+          }
+        } else if (kind === "sand") {
+          for (let i = 0; i < 1100; i++) {
+            ctx.fillStyle = shade(0.85 + random() * 0.35);
+            ctx.globalAlpha = 0.35;
+            ctx.fillRect(random() * w, random() * h, 1 + random(), 1);
+          }
+          // Wind ripples.
+          ctx.globalAlpha = 0.16;
+          ctx.lineWidth = 2.5;
+          for (let y = 10; y < h; y += 22) {
+            ctx.strokeStyle = shade(1.15);
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.bezierCurveTo(w * 0.3, y + 6, w * 0.7, y - 6, w, y);
+            ctx.stroke();
+          }
+        } else {
+          for (let i = 0; i < 900; i++) {
+            ctx.fillStyle = shade(0.75 + random() * 0.6);
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(random() * w, random() * h, 1.5 + random() * 2, 1 + random() * 1.5);
+          }
+        }
+        ctx.globalAlpha = 1;
+      },
+      [7, 7],
+    );
+    material = new THREE.MeshStandardMaterial({
+      map: texture,
+      bumpMap: texture,
+      bumpScale: kind === "grass" ? 0.03 : 0.02,
+      roughness: kind === "asphalt" ? 0.88 : 0.95,
+    });
+    materials.set(key, material);
+  }
+  return material;
+}
+
+/** Soft radial light pool — additive decal under a window. */
+export function lightPoolTexture(): THREE.CanvasTexture {
+  return proceduralTexture("light-pool", 128, 128, (ctx, w, h) => {
+    const gradient = ctx.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2);
+    gradient.addColorStop(0, "rgba(255,255,255,0.55)");
+    gradient.addColorStop(0.6, "rgba(255,255,255,0.2)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+  });
 }
 
 /** Indoor floorboards: planks with seams and gentle shade variation. */
