@@ -39,6 +39,11 @@ const RELATIONAL_JITTER = 0.15;
 const PERSON_YAW_JITTER = 0.4;
 const DEPTH_OFFSET = 1.2;
 const BESIDE_OFFSET = 1.5;
+// Sitting at a table: close enough that knees tuck under the edge
+// (pedestal tables are ~0.5 radius), not the generic standing gap.
+const SEAT_OFFSET = 0.85;
+// "far left/right": up against the room's side walls / stage edges.
+const FAR_LATERAL = 6.2;
 const ON_LATERAL_NUDGE = 0.8;
 // "above" floats clear of the anchor's top (wall-mounted boards etc.).
 const ABOVE_CLEARANCE = 0.7;
@@ -51,6 +56,7 @@ export function surfaceHeightFor(descriptor: string): number {
   if (/blanket|mat\b|rug|towel/.test(text)) return 0.03;
   if (/counter|machine|case|fridge/.test(text)) return 0.95;
   if (/bench|chair|seat|stool/.test(text)) return 0.5;
+  if (/shelf|bookcase|rack\b/.test(text)) return 0.83; // middle board
   if (/table|desk/.test(text)) return 0.74;
   if (/shelter|tree|roof/.test(text)) return 2.2;
   return 0.8;
@@ -71,7 +77,7 @@ type RelationKind = "behind" | "in_front_of" | "beside" | "on" | "above" | "unde
 // Priority order: multi-word phrases first so "in front of" never matches
 // as a bare "on". "inside" shares "under"'s placement (at the anchor's
 // footprint, on the ground).
-const RELATIONS: { keyword: string; kind: RelationKind }[] = [
+const RELATIONS: { keyword: string; kind: RelationKind; minScore?: number }[] = [
   { keyword: "in front of", kind: "in_front_of" },
   { keyword: "behind", kind: "behind" },
   { keyword: "next to", kind: "beside" },
@@ -83,6 +89,10 @@ const RELATIONS: { keyword: string; kind: RelationKind }[] = [
   { keyword: "inside", kind: "under" },
   // "around" centers on the anchor; the builder spreads outward from there.
   { keyword: "around", kind: "under" },
+  // "at" is weak ("at a corner table" shouldn't grab whichever table
+  // matches first), so it only anchors on a confident two-word match
+  // ("at the window table" -> o_window_table).
+  { keyword: "at", kind: "beside", minScore: 2 },
 ];
 
 // Words that never identify an anchor entity ("on the counter, left end").
@@ -135,7 +145,9 @@ export function parsePosition(position: string): {
     depth = DEPTH.farBackground;
   } else if (text.includes("background")) depth = DEPTH.background;
   let lateral: number = LATERAL.center;
-  if (text.includes("left")) lateral = LATERAL.left;
+  if (/far left|left wall/.test(text)) lateral = -FAR_LATERAL;
+  else if (/far right|right wall/.test(text)) lateral = FAR_LATERAL;
+  else if (text.includes("left")) lateral = LATERAL.left;
   else if (text.includes("right")) lateral = LATERAL.right;
   // The frustum widens with distance: spread far-background slots so
   // distant scenery clears the regular background row instead of
@@ -183,7 +195,9 @@ function parseRelation(
         bestScore = score;
       }
     }
-    if (best) return { kind: relation.kind, targetId: best.id };
+    if (best && bestScore >= (relation.minScore ?? 1)) {
+      return { kind: relation.kind, targetId: best.id };
+    }
   }
   return null;
 }
@@ -198,13 +212,20 @@ function rotationFor(entry: CompileEntry): number {
 
 function absoluteTransform(entry: CompileEntry): PlacedTransform {
   const { depth, lateral } = parsePosition(entry.position);
+  const text = entry.position.toLowerCase();
+  // Furniture "against the left/right wall" turns to face into the room.
+  let rotationY = rotationFor(entry);
+  if (!entry.isPerson) {
+    if (text.includes("left wall")) rotationY = Math.PI / 2;
+    else if (text.includes("right wall")) rotationY = -Math.PI / 2;
+  }
   return {
     position: [
       lateral + jitter(entry.id, "x", ABSOLUTE_JITTER),
       0,
       depth + jitter(entry.id, "z", ABSOLUTE_JITTER),
     ],
-    rotationY: rotationFor(entry),
+    rotationY,
   };
 }
 
@@ -219,6 +240,10 @@ function relationalTransform(
   const jz = jitter(entry.id, "z", RELATIONAL_JITTER);
   const surface = ay + surfaceHeightFor(anchorDescriptor);
   const clearance = clearanceFor(anchorDescriptor);
+  // A person beside/at a table or desk is sitting at it: pull in to seat
+  // distance and turn to face it instead of the camera.
+  const atFurniture =
+    entry.isPerson && /table|desk/.test(anchorDescriptor.toLowerCase());
   let position: [number, number, number];
   switch (kind) {
     case "behind":
@@ -231,7 +256,14 @@ function relationalTransform(
       const side =
         explicitSide(entry.position) ||
         (hash01(`${entry.id}:side`) < 0.5 ? -1 : 1);
-      position = [ax + side * (BESIDE_OFFSET + clearance) + jx, ay, az + jz];
+      const distance = atFurniture ? SEAT_OFFSET : BESIDE_OFFSET + clearance;
+      // Less jitter at a table — a chair pushed 0.15 into it reads wrong.
+      const seatJitter = atFurniture ? 0.4 : 1;
+      position = [
+        ax + side * distance + jx * seatJitter,
+        ay,
+        az + jz * seatJitter,
+      ];
       break;
     }
     case "on":
@@ -252,7 +284,11 @@ function relationalTransform(
       position = [ax + jx, 0, az + jz];
       break;
   }
-  return { position, rotationY: rotationFor(entry) };
+  const rotationY =
+    atFurniture && kind === "beside"
+      ? Math.atan2(ax - position[0], az - position[2])
+      : rotationFor(entry);
+  return { position, rotationY };
 }
 
 export function compileScene(scene: SceneSpec): PlacedEntity[] {

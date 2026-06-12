@@ -780,6 +780,106 @@ const buildClock: ObjectBuilder = (kit, parent) => {
   return undefined;
 };
 
+// --- Coffee-shop dressing: mug rack, brew shelf, grinder, bean sacks ---
+
+const MUG_TINTS = [0xb04a4a, 0x4a6fb0, 0x4ab06f, 0xd9b832, 0xd97a2b, 0x7a5ba6];
+
+// Free-standing display rack: posts, a back board, and rows of hung mugs.
+const buildMugRack: ObjectBuilder = (kit, parent) => {
+  const wood = finish.wood(0x5d4023);
+  for (const x of [-0.55, 0.55]) {
+    kit.box(wood, x, 0.85, 0, 0.06, 1.7, 0.1, false, parent);
+  }
+  rbox(kit, wood, 0, 1.1, -0.03, 1.16, 1.0, 0.04, parent, 0.012);
+  const mugGeometry = kit.track(new THREE.CylinderGeometry(0.05, 0.045, 0.09, 12));
+  const handleGeometry = kit.track(new THREE.TorusGeometry(0.028, 0.008, 6, 10, Math.PI));
+  let m = 0;
+  for (const y of [1.42, 1.12, 0.82]) {
+    for (const x of [-0.38, -0.13, 0.13, 0.38]) {
+      const ceramic = finish.ceramic(MUG_TINTS[m % MUG_TINTS.length]);
+      kit.mesh(mugGeometry, ceramic, x, y, 0.06, parent);
+      const handle = kit.mesh(handleGeometry, ceramic, x + 0.055, y, 0.06, parent);
+      handle.rotation.z = -Math.PI / 2;
+      m++;
+    }
+  }
+  return undefined;
+};
+
+// Shelf of copper coffee pots and a French press; the antique grinder is
+// its own entity placed "on the brewing shelf".
+const buildBrewShelf: ObjectBuilder = (kit, parent) => {
+  const wood = finish.wood(0x4a3a28);
+  for (const x of [-0.55, 0.55]) {
+    rbox(kit, wood, x, 0.8, 0, 0.06, 1.6, 0.32, parent, 0.015);
+  }
+  for (const y of [0.3, 0.8, 1.3]) {
+    rbox(kit, wood, 0, y, 0, 1.16, 0.05, 0.32, parent, 0.012);
+  }
+  const copper = finish.metal(0xb87333);
+  const bellyGeometry = kit.track(new THREE.CylinderGeometry(0.07, 0.085, 0.16, 12));
+  const spoutGeometry = kit.track(new THREE.CylinderGeometry(0.012, 0.02, 0.12, 8));
+  const knobGeometry = kit.track(new THREE.SphereGeometry(0.018, 8, 6));
+  const pot = (x: number, y: number, scale: number) => {
+    const group = new THREE.Group();
+    group.position.set(x, y, 0);
+    group.scale.setScalar(scale);
+    parent.add(group);
+    kit.mesh(bellyGeometry, copper, 0, 0.08, 0, group);
+    kit.mesh(knobGeometry, copper, 0, 0.18, 0, group);
+    const spout = kit.mesh(spoutGeometry, copper, 0.09, 0.12, 0, group);
+    spout.rotation.z = -0.7;
+  };
+  pot(-0.3, 1.325, 1);
+  pot(0.05, 1.325, 0.85);
+  pot(0.33, 0.325, 0.9);
+  // French press: glass body, dark lid, plunger rod and knob.
+  const glass = finish.glass(0xd8e6ea);
+  const dark = finish.plastic(0x2b2e33);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 12)), glass, -0.32, 0.405, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.052, 0.052, 0.02, 12)), dark, -0.32, 0.49, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.008, 0.008, 0.05, 6)), dark, -0.32, 0.52, 0, parent);
+  kit.mesh(knobGeometry, dark, -0.32, 0.55, 0, parent);
+  return undefined;
+};
+
+const buildGrinder: ObjectBuilder = (kit, parent) => {
+  const wood = finish.wood(0x5d4023);
+  const iron = finish.iron(0x3a3d42);
+  rbox(kit, wood, 0, 0.07, 0, 0.16, 0.14, 0.16, parent, 0.015); // body
+  kit.box(iron, 0, 0.045, 0.082, 0.05, 0.03, 0.01, false, parent); // drawer pull
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.05, 0.065, 0.06, 10)), iron, 0, 0.17, 0, parent); // hopper
+  const arm = kit.box(iron, 0.05, 0.225, 0, 0.12, 0.012, 0.012, false, parent); // crank
+  arm.rotation.z = 0.15;
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.016, 8, 6)), wood, 0.11, 0.245, 0, parent);
+  return undefined;
+};
+
+const buildBeanSacks: ObjectBuilder = (kit, parent) => {
+  const burlap = finish.fabric(0x9a7e57);
+  const beans = finish.wood(0x3a2618);
+  const beanGeometry = kit.track(new THREE.SphereGeometry(0.022, 6, 5));
+  const sack = (x: number, z: number, lean: number, open: boolean) => {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.rotation.y = lean;
+    parent.add(group);
+    rbox(kit, burlap, 0, 0.26, 0, 0.46, 0.52, 0.4, group, 0.12);
+    if (open) {
+      // Beans visible at the open mouth, a few spilled on the floor.
+      kit.mesh(kit.track(new THREE.CylinderGeometry(0.16, 0.16, 0.04, 12)), beans, 0, 0.5, 0, group);
+      for (const [bx, bz] of [[0.3, 0.12], [0.38, -0.06], [0.27, -0.18], [0.45, 0.02]]) {
+        kit.mesh(beanGeometry, beans, bx, 0.022, bz, group);
+      }
+    } else {
+      kit.mesh(kit.track(new THREE.CylinderGeometry(0.07, 0.1, 0.1, 8)), burlap, 0, 0.56, 0, group); // cinched neck
+    }
+  };
+  sack(-0.18, 0.05, 0.3, true);
+  sack(0.22, -0.12, -0.2, false);
+  return undefined;
+};
+
 const buildBriefcase: ObjectBuilder = (kit, parent) => {
   const leather = finish.wood(0x5d3a1e); // matte leather
   const brass = finish.metal(0xb08d3a);
@@ -1177,6 +1277,11 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   // generic /lamp/ further down covers freestanding lamps.
   [/pendant|hanging lamp|lantern/, buildPendantLamp],
   [/clock/, buildClock],
+  // Coffee-shop dressing; "mug rack" must beat the bare cup/mug builder.
+  [/mug rack|display rack/, buildMugRack],
+  [/brewing shelf|coffee pot|french press/, buildBrewShelf],
+  [/grinder/, buildGrinder],
+  [/sack|burlap/, buildBeanSacks],
   // "shelter bench" must hit the bench builder, not the shelter one.
   [/bench/, buildBench],
   [/shelter/, buildShelter],
