@@ -1,0 +1,229 @@
+[
+  {
+    "id": "park-morning",
+    "task": 3,
+    "title": "A Quiet Morning in the Park",
+    "difficulty": "easy",
+    "setting": {
+      "location": "a small neighbourhood park",
+      "time_of_day": "morning",
+      "weather": "sunny with a few clouds",
+      "indoor": false
+    },
+    "people": [
+      {
+        "id": "p_old_man",
+        "description": "an elderly man in a grey cardigan and flat cap",
+        "action": "reading a newspaper",
+        "position": "foreground left, on the bench"
+      },
+      {
+        "id": "p_jogger",
+        "description": "a young woman in a bright orange running jacket",
+        "action": "jogging along the path",
+        "position": "background right, on the path"
+      }
+    ],
+    "objects": [
+      {
+        "id": "o_bench",
+        "name": "wooden park bench",
+        "position": "foreground left",
+        "detail": "green painted slats with cast-iron armrests"
+      },
+      {
+        "id": "o_fountain",
+        "name": "stone fountain",
+        "position": "centre of the park",
+        "detail": "round basin with a small jet of water"
+      },
+      {
+        "id": "o_oak_tree",
+        "name": "large oak tree",
+        "position": "background left",
+        "detail": "thick trunk casting a long morning shadow"
+      }
+    ],
+    "spatial_relationships": [
+      { "subject": "p_old_man", "relation": "is sitting on", "target": "o_bench" },
+      { "subject": "o_bench", "relation": "is under", "target": "o_oak_tree" },
+      { "subject": "p_jogger", "relation": "is running past", "target": "o_fountain" }
+    ],
+    "anomaly": null,
+    "elements": {
+      "counts": { "people": 2, "objects": 3 }
+    },
+    "model_answer": "This picture shows a quiet park on a sunny morning. In the foreground on the left, an elderly man wearing a grey cardigan and a flat cap is sitting on a green wooden bench, reading his newspaper. The bench sits in the shade of a large oak tree behind him. In the centre of the park there is a round stone fountain with a small jet of water. In the background on the right, a young woman in a bright orange running jacket is jogging along the path, just passing the fountain. Overall, it looks like a calm and peaceful start to the day."
+  },
+  {
+    "id": "cafe-rush",
+    "task": 3,
+    "title": "Rush Hour at the Corner Café",
+    "difficulty": "hard",
+    "setting": {
+      "location": "a busy corner café",
+      "time_of_day": "early morning",
+      "weather": "raining outside",
+      "indoor": true
+    },
+    "people": [
+      {
+        "id": "p_barista",
+        "description": "a barista in a black apron",
+        "action": "steaming milk at the espresso machine",
+        "position": "behind the counter"
+      },
+      {
+        "id": "p_businessman",
+        "description": "a man in a navy suit holding a wet umbrella",
+        "action": "waiting in line and checking his phone",
+        "position": "middle of the room, front of the queue"
+      },
+      {
+        "id": "p_student",
+        "description": "a student with headphones and a laptop",
+        "action": "typing while sipping a latte",
+        "position": "at the window table, foreground right"
+      },
+      {
+        "id": "p_mother",
+        "description": "a mother in a yellow raincoat",
+        "action": "wiping crumbs off the table for her son",
+        "position": "background left, at a corner table"
+      },
+      {
+        "id": "p_child",
+        "description": "a small boy with a hot chocolate moustache",
+        "action": "kneeling on his chair and waving at the door",
+        "position": "background left, beside his mother"
+      }
+    ],
+    "objects": [
+      {
+        "id": "o_counter",
+        "name": "service counter",
+        "position": "along the back wall",
+        "detail": "polished wood top with a brass till"
+      },
+      {
+        "id": "o_espresso_machine",
+        "name": "espresso machine",
+        "position": "on the counter, left end",
+        "detail": "chrome machine hissing out steam"
+      },
+      {
+        "id": "o_pastry_case",
+        "name": "glass pastry case",
+        "position": "on the counter, right end",
+        "detail": "stacked with croissants and muffins"
+      },
+      {
+        "id": "o_menu_board",
+        "name": "chalkboard menu",
+        "position": "high on the back wall",
+        "detail": "handwritten prices with a doodle of a coffee cup"
+      },
+      {
+        "id": "o_window_table",
+        "name": "window table",
+        "position": "foreground right, by the window",
+        "detail": "small round table with rain streaking the glass behind it"
+      },
+      {
+        "id": "o_umbrella_stand",
+        "name": "umbrella stand",
+        "position": "beside the entrance door",
+        "detail": "metal bucket already crowded with dripping umbrellas"
+      }
+    ],
+    "spatial_relationships": [
+      { "subject": "p_barista", "relation": "is standing behind", "target": "o_counter" },
+      { "subject": "p_barista", "relation": "is operating", "target": "o_espresso_machine" },
+      { "subject": "o_menu_board", "relation": "is hanging above", "target": "o_counter" },
+      { "subject": "o_pastry_case", "relation": "is at the right end of", "target": "o_counter" },
+      { "subject": "p_businessman", "relation": "is queuing in front of", "target": "o_pastry_case" },
+      { "subject": "p_student", "relation": "is sitting at", "target": "o_window_table" },
+      { "subject": "p_child", "relation": "is sitting next to", "target": "p_mother" }
+    ],
+    "anomaly": null,
+    "elements": {
+      "counts": { "people": 5, "objects": 6 }
+    },
+    "model_answer": "This is a busy corner café on a rainy morning. Behind the counter at the back, a barista in a black apron is steaming milk at a chrome espresso machine, and a chalkboard menu hangs above her. At the right end of the counter there is a glass pastry case full of croissants, and a man in a navy suit is waiting in front of it, checking his phone while holding a wet umbrella. In the foreground on the right, a student wearing headphones is typing on a laptop at a small window table; you can see rain streaking the glass behind him. In the back left corner, a mother in a yellow raincoat is wiping the table while her little boy kneels on his chair and waves at the door. Next to the entrance, a metal umbrella stand is already crowded with dripping umbrellas, so it is clearly a wet and hectic start to the day."
+  },
+  {
+    "id": "bus-stop-diver",
+    "task": 8,
+    "title": "A Scuba Diver at the Bus Stop",
+    "difficulty": "medium",
+    "setting": {
+      "location": "a city bus stop",
+      "time_of_day": "late afternoon",
+      "weather": "clear and dry",
+      "indoor": false
+    },
+    "people": [
+      {
+        "id": "p_diver",
+        "description": "a man in a full scuba wetsuit, mask, and flippers",
+        "action": "standing in the queue holding a transit pass",
+        "position": "middle of the queue, foreground centre"
+      },
+      {
+        "id": "p_commuter",
+        "description": "a woman in a beige trench coat",
+        "action": "glancing sideways at the diver while checking her watch",
+        "position": "front of the queue, foreground left"
+      },
+      {
+        "id": "p_teenager",
+        "description": "a teenager with a backpack",
+        "action": "taking a photo of the diver with his phone",
+        "position": "back of the queue, foreground right"
+      }
+    ],
+    "objects": [
+      {
+        "id": "o_bus_shelter",
+        "name": "glass bus shelter",
+        "position": "behind the queue",
+        "detail": "glass panels with a route map poster"
+      },
+      {
+        "id": "o_bench",
+        "name": "shelter bench",
+        "position": "inside the shelter",
+        "detail": "narrow metal bench"
+      },
+      {
+        "id": "o_stop_sign",
+        "name": "bus stop sign",
+        "position": "left edge of the kerb",
+        "detail": "pole with the route number 42"
+      },
+      {
+        "id": "o_briefcase",
+        "name": "leather briefcase",
+        "position": "on the bench",
+        "detail": "left unattended next to a folded jacket"
+      }
+    ],
+    "spatial_relationships": [
+      { "subject": "p_commuter", "relation": "is standing in front of", "target": "p_diver" },
+      { "subject": "p_teenager", "relation": "is standing behind", "target": "p_diver" },
+      { "subject": "o_briefcase", "relation": "is sitting on", "target": "o_bench" },
+      { "subject": "o_bench", "relation": "is inside", "target": "o_bus_shelter" },
+      { "subject": "o_stop_sign", "relation": "is to the left of", "target": "o_bus_shelter" }
+    ],
+    "anomaly": {
+      "id": "p_diver",
+      "description": "a man waiting for the bus in full scuba gear, including a mask, wetsuit, and flippers",
+      "why_unusual": "scuba equipment belongs in the ocean, not at a dry city bus stop nowhere near water, and flippers make it almost impossible to walk onto a bus",
+      "position": "middle of the queue, foreground centre"
+    },
+    "elements": {
+      "counts": { "people": 3, "objects": 4 }
+    },
+    "model_answer": "This picture shows an ordinary city bus stop on a clear afternoon, but something very strange is happening. In the middle of the queue, a man is waiting for the bus dressed in a full scuba wetsuit, with a diving mask on his face and flippers on his feet, calmly holding a transit pass. This is bizarre because there is no water anywhere nearby — scuba gear belongs in the ocean, and it would be almost impossible to climb onto a bus wearing flippers. The people around him have clearly noticed: the woman in a trench coat at the front of the queue keeps glancing sideways at him while pretending to check her watch, and the teenager behind him is openly taking a photo with his phone. Behind them is a normal glass bus shelter with a route map, a metal bench with someone's briefcase on it, and a route 42 sign at the kerb, which makes the diver stand out even more. Perhaps he lost a bet, or he is on his way to a costume party."
+  }
+]
