@@ -47,12 +47,23 @@ const ABOVE_CLEARANCE = 0.7;
  *  The mesh factory builds its primitives to match these. */
 export function surfaceHeightFor(descriptor: string): number {
   const text = descriptor.toLowerCase();
+  if (/path|trail|walkway|road/.test(text)) return 0; // flat on the ground
   if (/blanket|mat\b|rug|towel/.test(text)) return 0.03;
   if (/counter|machine|case|fridge/.test(text)) return 0.95;
   if (/bench|chair|seat|stool/.test(text)) return 0.5;
   if (/table|desk/.test(text)) return 0.74;
   if (/shelter|tree|roof/.test(text)) return 2.2;
   return 0.8;
+}
+
+/** Extra radial clearance wide anchors need before beside/behind/in-front
+ *  offsets, so neighbours land outside their footprint (e.g. a dog "near
+ *  the pond" stands on the bank, not in the water). */
+function clearanceFor(descriptor: string): number {
+  const text = descriptor.toLowerCase();
+  if (/pond|lake|fountain/.test(text)) return 1.0;
+  if (/tree|oak/.test(text)) return 0.4;
+  return 0;
 }
 
 type RelationKind = "behind" | "in_front_of" | "beside" | "on" | "above" | "under";
@@ -207,19 +218,20 @@ function relationalTransform(
   const jx = jitter(entry.id, "x", RELATIONAL_JITTER);
   const jz = jitter(entry.id, "z", RELATIONAL_JITTER);
   const surface = ay + surfaceHeightFor(anchorDescriptor);
+  const clearance = clearanceFor(anchorDescriptor);
   let position: [number, number, number];
   switch (kind) {
     case "behind":
-      position = [ax + jx, 0, az - DEPTH_OFFSET + jz];
+      position = [ax + jx, 0, az - DEPTH_OFFSET - clearance + jz];
       break;
     case "in_front_of":
-      position = [ax + jx, 0, az + DEPTH_OFFSET + jz];
+      position = [ax + jx, 0, az + DEPTH_OFFSET + clearance + jz];
       break;
     case "beside": {
       const side =
         explicitSide(entry.position) ||
         (hash01(`${entry.id}:side`) < 0.5 ? -1 : 1);
-      position = [ax + side * BESIDE_OFFSET + jx, ay, az + jz];
+      position = [ax + side * (BESIDE_OFFSET + clearance) + jx, ay, az + jz];
       break;
     }
     case "on":

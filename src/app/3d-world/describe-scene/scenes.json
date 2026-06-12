@@ -21,7 +21,7 @@
         "id": "p_jogger",
         "description": "a young woman in a bright orange running jacket",
         "action": "jogging along the path",
-        "position": "background right, on the path"
+        "position": "background, on the path"
       }
     ],
     "objects": [
@@ -78,6 +78,18 @@
         "name": "stand of trees",
         "position": "around the pond",
         "detail": "a loose ring of oaks of slightly different sizes circling the pond"
+      },
+      {
+        "id": "o_path",
+        "name": "gravel path",
+        "position": "background right",
+        "detail": "a gravel walking path curving past the fountain toward the back of the park"
+      },
+      {
+        "id": "o_pond_dog",
+        "name": "brown dog",
+        "position": "in front of the pond",
+        "detail": "small brown dog sniffing at the water's edge"
       }
     ],
     "spatial_relationships": [
@@ -115,16 +127,26 @@
         "subject": "o_pond_trees",
         "relation": "surrounds",
         "target": "o_pond"
+      },
+      {
+        "subject": "p_jogger",
+        "relation": "is running along",
+        "target": "o_path"
+      },
+      {
+        "subject": "o_pond_dog",
+        "relation": "is near",
+        "target": "o_pond"
       }
     ],
     "anomaly": null,
     "elements": {
       "counts": {
         "people": 2,
-        "objects": 9
+        "objects": 11
       }
     },
-    "model_answer": "This picture shows a quiet park on a sunny morning. In the foreground on the left, an elderly man wearing a grey cardigan and a flat cap is sitting on a green wooden bench, reading his newspaper. The bench sits in the shade of a large oak tree behind him. In the centre of the park there is a round stone fountain with a small jet of water. On the right in the foreground, a red and white checked picnic blanket is spread on the grass with a wicker basket on it, and a small tan dog with a red collar is sniffing around next to it. Far away on the left, beyond the oak tree, a small pond ringed by a stand of trees glints in the morning light, and a few flowering bushes grow across the back of the lawn. In the background on the right, a young woman in a bright orange running jacket is jogging along the path, just passing the fountain. Overall, it looks like a calm and peaceful start to the day."
+    "model_answer": "This picture shows a quiet park on a sunny morning. In the foreground on the left, an elderly man wearing a grey cardigan and a flat cap is sitting on a green wooden bench, reading his newspaper. The bench sits in the shade of a large oak tree behind him. In the centre of the park there is a round stone fountain with a small jet of water. On the right in the foreground, a red and white checked picnic blanket is spread on the grass with a wicker basket on it, and a small tan dog with a red collar is sniffing around next to it. Far away on the left, beyond the oak tree, a small pond ringed by a stand of trees glints in the morning light, where a small brown dog is sniffing at the water's edge, and a few flowering bushes grow across the back of the lawn. In the background on the right, a young woman in a bright orange running jacket is jogging along a gravel path that curves past the fountain toward the back of the park. Overall, it looks like a calm and peaceful start to the day."
   },
   {
     "id": "cafe-rush",

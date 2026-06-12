@@ -6,10 +6,11 @@ import { finish, sharedMaterial } from "./materials";
 import {
   fitText,
   foliageMaterial,
+  rng,
   surfaceMaterial,
   woodMaterial,
 } from "./textures";
-import { colorFromText } from "./palette";
+import { colorFromText, COLOR_WORDS } from "./palette";
 import { buildPerson } from "./person";
 import type { Update } from "./person";
 import type { PlacedEntity } from "./compile";
@@ -927,15 +928,31 @@ const buildBasket: ObjectBuilder = (kit, parent) => {
   return undefined;
 };
 
-const buildDog: ObjectBuilder = (kit, parent) => {
-  const coat = finish.fabric(0xb08d57);
-  const coatLight = finish.fabric(0xd2b88a);
+const buildDog: ObjectBuilder = (kit, parent, entity) => {
+  // The earliest color word in the descriptor recoats the dog ("tan dog
+  // with a red collar" stays tan); default is tan.
+  let coatTint = 0xb08d57;
+  let earliest = Infinity;
+  const text = entity.descriptor.toLowerCase();
+  for (const [pattern, color] of COLOR_WORDS) {
+    const match = pattern.exec(text);
+    if (match && match.index < earliest) {
+      earliest = match.index;
+      coatTint = color;
+    }
+  }
+  if (coatTint === 0xcbb594) coatTint = 0xb08d57; // clothing tan washes out as fur
+  const coat = finish.fabric(coatTint);
+  const coatLight = finish.fabric(
+    new THREE.Color(coatTint).lerp(new THREE.Color(0xfff2dd), 0.4).getHex(),
+  );
   const dark = finish.plastic(0x2b2e33);
   const collar = finish.paint(0xb33a3a);
-  // Angled off-axis so it reads as wandering, not posed.
+  // Angled off-axis (seeded) so each dog wanders its own way.
   const dog = new THREE.Group();
-  dog.rotation.y = -0.55;
+  dog.rotation.y = -0.55 + (hash01(`${entity.id}:yaw`) - 0.5) * 1.2;
   parent.add(dog);
+  const phase = hash01(`${entity.id}:wag`) * Math.PI * 2;
   const bodyGeometry = kit.track(
     new THREE.CapsuleGeometry(0.155, 0.3, 4, 12).rotateX(Math.PI / 2),
   );
@@ -976,9 +993,76 @@ const buildDog: ObjectBuilder = (kit, parent) => {
   const tailGeometry = kit.track(new THREE.CapsuleGeometry(0.024, 0.14, 4, 8));
   kit.mesh(tailGeometry, coat, 0, 0.09, 0, tailPivot);
   return (t) => {
-    tailPivot.rotation.z = Math.sin(t * 7) * 0.35;
-    head.rotation.x = 0.5 + Math.sin(t * 0.9) * 0.15; // sniffing bob
+    tailPivot.rotation.z = Math.sin(t * 7 + phase) * 0.35;
+    head.rotation.x = 0.5 + Math.sin(t * 0.9 + phase) * 0.15; // sniffing bob
   };
+};
+
+/** A gravel path as a spline ribbon hugging the ground. The curve passes
+ *  through the entity anchor (local 0,0), which is exactly where an
+ *  "on the path" placement lands, so the jogger stands on its center
+ *  line as it sweeps past the fountain toward the back of the park. */
+const buildPath: ObjectBuilder = (kit, parent) => {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(3.8, 0, 10.5),
+    new THREE.Vector3(1.3, 0, 7.5),
+    new THREE.Vector3(-0.2, 0, 4),
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(-2.2, 0, -3.5),
+  ]);
+  const gravel = surfaceMaterial(
+    "path-gravel", 128, 128,
+    (ctx, w, h) => {
+      ctx.fillStyle = "#9a8a6e";
+      ctx.fillRect(0, 0, w, h);
+      const random = rng("path-gravel");
+      const tones = ["#8a7a5e", "#ab9b7e", "#7e7058", "#b5a787"];
+      for (let i = 0; i < 600; i++) {
+        ctx.fillStyle = tones[Math.floor(random() * tones.length)];
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(random() * w, random() * h, 1.5 + random() * 2.5, 1 + random() * 2);
+      }
+      ctx.globalAlpha = 1;
+    },
+    { roughness: 0.95, repeat: [1, 1] },
+  );
+  const segments = 56;
+  const width = 1.1;
+  const length = curve.getLength();
+  const positions = new Float32Array((segments + 1) * 2 * 3);
+  const normals = new Float32Array((segments + 1) * 2 * 3);
+  const uvs = new Float32Array((segments + 1) * 2 * 2);
+  const indices: number[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const point = curve.getPoint(t);
+    const tangent = curve.getTangent(t);
+    // Perpendicular in the ground plane.
+    const nx = -tangent.z;
+    const nz = tangent.x;
+    for (const [edge, side] of [[0, -1], [1, 1]] as const) {
+      const v = (i * 2 + edge) * 3;
+      positions[v] = point.x + nx * side * (width / 2);
+      positions[v + 1] = 0.012;
+      positions[v + 2] = point.z + nz * side * (width / 2);
+      normals[v + 1] = 1;
+      uvs[(i * 2 + edge) * 2] = (t * length) / 1.3;
+      uvs[(i * 2 + edge) * 2 + 1] = edge;
+    }
+    if (i < segments) {
+      const a = i * 2;
+      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+  }
+  const geometry = kit.track(new THREE.BufferGeometry());
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  const ribbon = new THREE.Mesh(geometry, gravel);
+  ribbon.receiveShadow = true;
+  parent.add(ribbon);
+  return undefined;
 };
 
 const buildScreen: ObjectBuilder = (kit, parent) => {
@@ -1009,6 +1093,9 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   // "shelter bench" must hit the bench builder, not the shelter one.
   [/bench/, buildBench],
   [/shelter/, buildShelter],
+  // Path before fountain/tree: its detail text may mention the scenery
+  // it curves past.
+  [/path|trail|walkway/, buildPath],
   [/fountain/, buildFountain],
   [/grove|stand of trees|\btrees\b/, buildTreeCluster],
   [/tree|oak/, buildTree],
@@ -1128,7 +1215,7 @@ export function buildSceneMeshes(entities: PlacedEntity[]): BuiltScene {
     if (
       entity.kind !== "person" &&
       entity.transform.position[1] < 1 &&
-      !/pond|lake|pool|puddle/.test(entity.descriptor.toLowerCase())
+      !/pond|lake|pool|puddle|path|trail/.test(entity.descriptor.toLowerCase())
     ) {
       const bounds = new THREE.Box3().setFromObject(group);
       const size = bounds.getSize(new THREE.Vector3());
