@@ -102,7 +102,7 @@
       {
         "id": "o_counter",
         "name": "service counter",
-        "position": "along the back wall",
+        "position": "background centre, along the back wall",
         "detail": "polished wood top with a brass till"
       },
       {
@@ -120,7 +120,7 @@
       {
         "id": "o_menu_board",
         "name": "chalkboard menu",
-        "position": "high on the back wall",
+        "position": "above the counter, high on the back wall",
         "detail": "handwritten prices with a doodle of a coffee cup"
       },
       {
@@ -132,7 +132,7 @@
       {
         "id": "o_umbrella_stand",
         "name": "umbrella stand",
-        "position": "beside the entrance door",
+        "position": "foreground left, beside the entrance door",
         "detail": "metal bucket already crowded with dripping umbrellas"
       }
     ],
@@ -186,7 +186,7 @@
       {
         "id": "o_bus_shelter",
         "name": "glass bus shelter",
-        "position": "behind the queue",
+        "position": "background centre, behind the queue",
         "detail": "glass panels with a route map poster"
       },
       {

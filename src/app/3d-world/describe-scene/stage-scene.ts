@@ -1,9 +1,17 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { buildDebugMarkers } from "./debug-markers";
+import type { PlacedEntity } from "./compile";
 
-// Empty stage for the "Describe the Scene" drill. Phase 1 renders only the
-// lit ground; scene entities are compiled onto it in later phases.
-export function createStageScene(container: HTMLElement): () => void {
+export interface StageHandle {
+  /** Swaps the displayed entities; the stage itself persists. */
+  setScene(entities: PlacedEntity[]): void;
+  dispose(): void;
+}
+
+// Stage for the "Describe the Scene" drill: lit ground plus whatever the
+// compiled scene places on it (Phase 2: debug markers only).
+export function createStageScene(container: HTMLElement): StageHandle {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x10121f);
   scene.fog = new THREE.Fog(0x10121f, 18, 34);
@@ -56,6 +64,16 @@ export function createStageScene(container: HTMLElement): () => void {
   controls.minPolarAngle = 1.25;
   controls.maxPolarAngle = 1.42;
 
+  let markers: { group: THREE.Group; dispose: () => void } | null = null;
+  const setScene = (entities: PlacedEntity[]) => {
+    if (markers) {
+      scene.remove(markers.group);
+      markers.dispose();
+    }
+    markers = buildDebugMarkers(entities);
+    scene.add(markers.group);
+  };
+
   let frame = 0;
   const animate = () => {
     frame = requestAnimationFrame(animate);
@@ -71,13 +89,17 @@ export function createStageScene(container: HTMLElement): () => void {
   };
   window.addEventListener("resize", onResize);
 
-  return () => {
-    cancelAnimationFrame(frame);
-    window.removeEventListener("resize", onResize);
-    controls.dispose();
-    groundGeometry.dispose();
-    groundMaterial.dispose();
-    renderer.dispose();
-    container.removeChild(renderer.domElement);
+  return {
+    setScene,
+    dispose: () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", onResize);
+      controls.dispose();
+      markers?.dispose();
+      groundGeometry.dispose();
+      groundMaterial.dispose();
+      renderer.dispose();
+      container.removeChild(renderer.domElement);
+    },
   };
 }

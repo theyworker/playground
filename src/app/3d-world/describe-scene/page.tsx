@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { loadScenes } from "./types";
+import { compileScene } from "./compile";
+import type { StageHandle } from "./stage-scene";
 
 // Validated at module load so a bad scenes.json fails the build, not the
 // learner mid-drill.
@@ -10,23 +12,37 @@ const scenes = loadScenes();
 
 export default function DescribeScenePage() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<StageHandle | null>(null);
+  const [stageReady, setStageReady] = useState(false);
+  const [sceneIndex, setSceneIndex] = useState(0);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    let cleanup: (() => void) | undefined;
     let cancelled = false;
+    let handle: StageHandle | undefined;
 
     import("./stage-scene").then(({ createStageScene }) => {
-      if (!cancelled) cleanup = createStageScene(container);
+      if (cancelled) return;
+      handle = createStageScene(container);
+      stageRef.current = handle;
+      setStageReady(true);
     });
 
     return () => {
       cancelled = true;
-      cleanup?.();
+      stageRef.current = null;
+      handle?.dispose();
     };
   }, []);
+
+  useEffect(() => {
+    if (!stageReady) return;
+    stageRef.current?.setScene(compileScene(scenes[sceneIndex]));
+  }, [stageReady, sceneIndex]);
+
+  const scene = scenes[sceneIndex];
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-[#10121f] text-slate-100">
@@ -36,14 +52,27 @@ export default function DescribeScenePage() {
         Describe the Scene
       </h1>
 
-      {/* Temporary Phase-1 check: confirms all scenes load and validate. */}
-      <ul className="pointer-events-none absolute left-6 top-14 space-y-1 text-xs text-slate-400">
-        {scenes.map((scene) => (
-          <li key={scene.id}>
-            Task {scene.task} &middot; {scene.title} ({scene.difficulty})
-          </li>
+      {/* Dev switcher: pages through the compiled scenes. */}
+      <nav className="absolute right-6 top-6 z-10 flex flex-col items-end gap-2">
+        {scenes.map((entry, index) => (
+          <button
+            key={entry.id}
+            onClick={() => setSceneIndex(index)}
+            className={`rounded border px-3 py-1.5 text-xs transition-colors ${
+              index === sceneIndex
+                ? "border-amber-300/70 bg-amber-300/10 text-amber-100"
+                : "border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-100"
+            }`}
+          >
+            Task {entry.task} &middot; {entry.title}
+          </button>
         ))}
-      </ul>
+      </nav>
+
+      <p className="pointer-events-none absolute bottom-6 right-6 text-xs text-slate-400">
+        {scene.title} &middot; Task {scene.task} &middot; {scene.difficulty}{" "}
+        &middot; {scene.setting.location}
+      </p>
 
       <Link
         href="/3d-world"
