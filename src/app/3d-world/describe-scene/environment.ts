@@ -6,6 +6,7 @@ import {
   lightPoolTexture,
   plankMaterial,
   proceduralTexture,
+  surfaceMaterial,
 } from "./textures";
 import type { GroundKind } from "./textures";
 import type { SceneSetting } from "./types";
@@ -336,7 +337,28 @@ function buildWindowWall(kit: Kit, wall: THREE.Material, trim: THREE.Material) {
 
 function buildRoom(kit: Kit, rainy: boolean) {
   const floor = plankMaterial(0x6b4a2c);
-  const wall = sharedMaterial({ color: 0xd9cdb4, roughness: 0.95 });
+  // Striped wallpaper with a dot motif (same pattern language as the
+  // pac-meeting house) so interiors read lived-in rather than bare.
+  const wall = surfaceMaterial(
+    "wallpaper", 128, 128,
+    (ctx) => {
+      ctx.fillStyle = "#b9a890";
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.fillStyle = "#ad9c83";
+      for (let x = 0; x < 128; x += 32) {
+        ctx.fillRect(x, 0, 14, 128);
+      }
+      ctx.fillStyle = "#c5b49c";
+      for (let x = 16; x < 128; x += 32) {
+        for (let y = 8; y < 128; y += 24) {
+          ctx.beginPath();
+          ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    },
+    { roughness: 0.95, repeat: [10, 2] },
+  );
   const trim = sharedMaterial({ color: 0x4a3a28, roughness: 0.85 });
   const width = ROOM_HALF_X * 2;
   const depth = ROOM_FRONT_Z - ROOM_BACK_Z;

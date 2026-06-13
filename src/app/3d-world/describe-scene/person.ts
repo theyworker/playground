@@ -566,9 +566,14 @@ export function buildPerson(
   const rig = buildRig(kit, parent, entity, tintOverride);
   const pose = poseFor(entity.action);
   // Anyone placed "on" a surface (bench, chair) sits regardless of what
-  // their hands are doing; sit/type imply sitting even on open ground.
+  // their hands are doing; sit/type and actions phrased as "sitting and
+  // reading/drinking" imply sitting even on open ground.
   const anchored = entity.transform.position[1] > 0.1;
-  const seated = anchored || pose === "sit" || pose === "type";
+  const seated =
+    anchored ||
+    pose === "sit" ||
+    pose === "type" ||
+    /\bsitting\b|\bseated\b/.test((entity.action ?? "").toLowerCase());
   if (seated) foldSeated(kit, rig, parent, anchored);
   const update = applyPose(kit, rig, pose, seated);
   return { rig, ...(update && !REDUCED_MOTION && { update }) };
