@@ -2,7 +2,14 @@ import * as THREE from "three";
 import { Kit } from "../pac-meeting/mansion-kit";
 import { hash01 } from "./compile";
 import { sharedMaterial } from "./materials";
-import { colorFromText, HAIR_PALETTE, pick, SKIN_TONES, TROUSER_PALETTE } from "./palette";
+import {
+  colorFromText,
+  HAIR_GREY,
+  HAIR_TONES,
+  pick,
+  SKIN_TONES,
+  TROUSER_PALETTE,
+} from "./palette";
 import { faceMaterial, stripedMaterial } from "./textures";
 import type { Mood } from "./textures";
 import type { PlacedEntity } from "./compile";
@@ -63,11 +70,22 @@ interface PersonGeometry {
   hand: THREE.SphereGeometry;
   thigh: THREE.CapsuleGeometry;
   shin: THREE.CapsuleGeometry;
-  /** Open-bottomed dome a hair's breadth wider than the skull. */
-  hairCap: THREE.SphereGeometry;
-  /** Unit ellipsoid scaled per-figure into the long back fall. */
-  hairFall: THREE.SphereGeometry;
+  // Hair/beard are outward sphere shells. Hair leaves a wedge open over
+  // the face (+Z); the three lengths stop at progressively lower theta.
+  // The beard is a small shell wrapping the lower-front jaw. All convex
+  // and viewed from outside, so FrontSide renders cleanly.
+  hairShort: THREE.SphereGeometry;
+  hairMedium: THREE.SphereGeometry;
+  hairLong: THREE.SphereGeometry;
+  hairBack: THREE.SphereGeometry; // long-hair drape down the back
+  beard: THREE.SphereGeometry;
 }
+
+// Face opening: hair spans every phi except a wedge centred on +Z (the
+// face). Beard is the complementary wedge over the lower front.
+const FACE_GAP = 0.82;
+const HAIR_PHI = Math.PI / 2 + FACE_GAP;
+const HAIR_PHI_LEN = Math.PI * 2 - 2 * FACE_GAP;
 
 // One geometry set per Kit (i.e. per scene build); every figure reuses it.
 const geometryCache = new WeakMap<Kit, PersonGeometry>();
@@ -85,13 +103,19 @@ function geometryFor(kit: Kit): PersonGeometry {
       hand: kit.track(new THREE.SphereGeometry(0.05, 10, 8)),
       thigh: kit.track(new THREE.CapsuleGeometry(0.07, 0.28, 4, 10)),
       shin: kit.track(new THREE.CapsuleGeometry(0.055, 0.26, 4, 10)),
-      // Shallow dome: the face texture draws brows at ~0.36PI from the top
-      // pole, so the cap stops at 0.34PI and the back-tilt below keeps the
-      // front rim above the forehead while dipping toward the nape.
-      hairCap: kit.track(
-        new THREE.SphereGeometry(0.127, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.34),
+      hairShort: kit.track(
+        new THREE.SphereGeometry(0.129, 20, 12, HAIR_PHI, HAIR_PHI_LEN, 0, Math.PI * 0.56),
       ),
-      hairFall: kit.track(new THREE.SphereGeometry(0.1, 12, 10)),
+      hairMedium: kit.track(
+        new THREE.SphereGeometry(0.131, 20, 16, HAIR_PHI, HAIR_PHI_LEN, 0, Math.PI * 0.82),
+      ),
+      hairLong: kit.track(
+        new THREE.SphereGeometry(0.133, 20, 18, HAIR_PHI, HAIR_PHI_LEN, 0, Math.PI * 0.95),
+      ),
+      hairBack: kit.track(new THREE.SphereGeometry(0.12, 14, 12)),
+      beard: kit.track(
+        new THREE.SphereGeometry(0.125, 18, 12, Math.PI / 2 - 1.15, 2.3, Math.PI * 0.46, Math.PI * 0.32),
+      ),
     };
     geometryCache.set(kit, geometry);
   }
@@ -105,44 +129,105 @@ interface Outfit {
   shoes: THREE.Material;
 }
 
-// Two hair treatments: a short cap for the guys, cap plus a long back
-// fall for the girls. Descriptor words decide; a neutral descriptor
-// ("a barista", "a student") splits 50/50 on the entity-id seed.
-function genderFor(descriptor: string, id: string): "female" | "male" {
-  const text = descriptor.toLowerCase();
-  if (/\bwoman\b|\bwomen\b|\bgirl\b|\blady\b|\bmother\b|\bmum\b|\bmom\b|\bgrandmother\b|\bgrandma\b|\bwaitress\b|\bdaughter\b|\bsister\b|\bniece\b|\baunt\b/.test(text)) {
-    return "female";
-  }
-  if (/\bman\b|\bmen\b|\bboy\b|\bguy\b|\bgentleman\b|\bfather\b|\bdad\b|\bgrandfather\b|\bgrandpa\b|\bson\b|\bbrother\b|\bnephew\b|\buncle\b|\bwaiter\b/.test(text)) {
-    return "male";
-  }
-  return hash01(`${id}:gender`) < 0.5 ? "female" : "male";
+type HairLength = "none" | "short" | "medium" | "long";
+type Beard = "none" | "stubble" | "full";
+
+interface Grooming {
+  hair: HairLength;
+  beard: Beard;
+  color: number;
 }
 
-function buildHair(
+// Reads gender/age cues from the descriptor, then fills the rest from the
+// seeded id: women get long/medium/short hair, men get short hair and a
+// beard most of the time, children are clean-shaven. Headgear and hoods
+// hide hair; masks/hoods hide beards too.
+function planGrooming(entity: PlacedEntity, suppressed: boolean): Grooming {
+  const d = entity.descriptor.toLowerCase();
+  const id = entity.id;
+  const elderly = /elderly|\bold\b|senior|grey|gray/.test(d);
+  const child = /\b(boy|girl|child|kid|toddler|infant)\b/.test(d);
+  const covered = /\b(cap|hat|beanie|helmet|hood|hijab|turban|headscarf|bandana)\b/.test(d);
+  const sealed = /scuba|wetsuit|diver|helmet|hood|hijab|turban/.test(d);
+
+  let gender: "male" | "female";
+  if (/\b(woman|women|lady|girl|mother|mum|mom|she|her|female|waitress|businesswoman)\b/.test(d)) {
+    gender = "female";
+  } else if (/\b(man|men|male|boy|father|dad|gentleman|businessman|waiter|he|his)\b/.test(d)) {
+    gender = "male";
+  } else {
+    gender = hash01(`${id}:gender`) < 0.5 ? "female" : "male";
+  }
+
+  const color = elderly ? HAIR_GREY : pick(HAIR_TONES, `${id}:hair`);
+
+  // Anomaly figures (the diver, via tintOverride) and sealed headgear hide
+  // everything; a cap/hat hides hair but a beard still shows.
+  if (suppressed || sealed) return { hair: "none", beard: "none", color };
+
+  if (gender === "female") {
+    const r = hash01(`${id}:hairlen`);
+    const hair: HairLength = covered
+      ? "none"
+      : r < 0.45
+        ? "long"
+        : r < 0.8
+          ? "medium"
+          : "short";
+    return { hair, beard: "none", color };
+  }
+
+  // Male: short hair unless covered; beards common (suppressed for kids).
+  const hair: HairLength = covered ? "none" : "short";
+  if (child) return { hair, beard: "none", color };
+  const b = hash01(`${id}:beard`);
+  const beard: Beard = elderly
+    ? "full"
+    : b < 0.5
+      ? "full"
+      : b < 0.8
+        ? "stubble"
+        : "none";
+  return { hair, beard, color };
+}
+
+// Hair/beard are parented to the head group so they follow head rotation.
+function buildGrooming(
   kit: Kit,
   geometry: PersonGeometry,
   head: THREE.Group,
-  entity: PlacedEntity,
+  grooming: Grooming,
 ) {
-  const text = entity.descriptor.toLowerCase();
-  if (/\bbald\b|shaved head/.test(text)) return;
-  const tint = /elderly|\bold\b|grey-haired|gray-haired|white-haired/.test(text)
-    ? 0x9b9b98
-    : pick(HAIR_PALETTE, `${entity.id}:hair`);
-  const hair = sharedMaterial({ color: tint, roughness: 0.95 });
-  // The cap matches the skull's 1.15 y-stretch; only the crown is covered,
-  // tilted back so the front rim stays clear above the brows and the back
-  // rim drops toward the nape.
-  const cap = kit.mesh(geometry.hairCap, hair, 0, 0.115, -0.01, head);
-  cap.name = "hairCap";
-  cap.scale.set(1.02, 1.15, 1.04);
-  cap.rotation.x = -0.35;
-  if (genderFor(entity.descriptor, entity.id) === "female") {
-    // Long fall down the back of the head to the shoulders.
-    const fall = kit.mesh(geometry.hairFall, hair, 0, 0, -0.075, head);
-    fall.name = "hairFall";
-    fall.scale.set(1.05, 1.9, 0.62);
+  const hairMat = sharedMaterial({ color: grooming.color, roughness: 0.9 });
+  if (grooming.hair !== "none") {
+    const shell =
+      grooming.hair === "long"
+        ? geometry.hairLong
+        : grooming.hair === "medium"
+          ? geometry.hairMedium
+          : geometry.hairShort;
+    const cap = kit.mesh(shell, hairMat, 0, 0.11, 0, head);
+    cap.scale.y = 1.12; // follow the skull's vertical stretch
+    if (grooming.hair === "long") {
+      // A flattened drape down the back makes "long" read in silhouette.
+      const back = kit.mesh(geometry.hairBack, hairMat, 0, 0.0, -0.05, head);
+      back.scale.set(0.95, 1.7, 0.6);
+    }
+  }
+  if (grooming.beard !== "none") {
+    // Stubble is the same shell pulled tight and darkened toward the skin.
+    const beardMat =
+      grooming.beard === "stubble"
+        ? sharedMaterial({
+            color: new THREE.Color(grooming.color)
+              .multiplyScalar(0.7)
+              .getHex(),
+            roughness: 0.95,
+          })
+        : hairMat;
+    const beard = kit.mesh(geometry.beard, beardMat, 0, 0.11, 0.004, head);
+    beard.scale.set(1, 1.12, 1);
+    if (grooming.beard === "stubble") beard.scale.multiplyScalar(0.99);
   }
 }
 
@@ -244,7 +329,9 @@ function buildRig(
   // blends seamlessly with the plain-skin neck and hands.
   const skull = kit.mesh(geometry.head, faceMaterial(skinTint, mood), 0, 0.11, 0, head);
   skull.scale.y = 1.15;
-  buildHair(kit, geometry, head, entity);
+  // tintOverride marks special figures (the diver) whose headgear hides
+  // hair; pass that through as a suppression flag.
+  buildGrooming(kit, geometry, head, planGrooming(entity, tintOverride !== undefined));
 
   return {
     pose,
