@@ -285,6 +285,69 @@ function buildClouds(kit: Kit): { update: (elapsed: number) => void } {
   };
 }
 
+/** The sea behind a beach: a broad rippled water plane across the far
+ *  background with a pale foam line where it meets the sand. Both gently
+ *  animate so the horizon reads as moving water, not a painted backdrop. */
+function buildOcean(kit: Kit): { update: (elapsed: number) => void } {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
+  // Banded blues, lighter toward the far edge, with wave streaks.
+  const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+  gradient.addColorStop(0, "#2f6f96");
+  gradient.addColorStop(1, "#5ea0bf");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 256, 256);
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.lineWidth = 2;
+  for (let y = 12; y < 256; y += 22) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.bezierCurveTo(85, y + 8, 170, y - 8, 256, y);
+    ctx.stroke();
+  }
+  const texture = kit.track(new THREE.CanvasTexture(canvas));
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 3);
+  const water = kit.track(
+    new THREE.MeshStandardMaterial({
+      map: texture,
+      color: 0x6ba6c4,
+      roughness: 0.22,
+      metalness: 0.1,
+    }),
+  );
+  const sea = new THREE.Mesh(
+    kit.track(new THREE.PlaneGeometry(52, 22).rotateX(-Math.PI / 2)),
+    water,
+  );
+  sea.position.set(0, 0.02, -15);
+  sea.receiveShadow = true;
+  kit.group.add(sea);
+  // Foam line at the shoreline where the surf meets the sand.
+  const foamMaterial = kit.track(
+    new THREE.MeshBasicMaterial({
+      color: 0xf2f6f5,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    }),
+  );
+  const foam = new THREE.Mesh(
+    kit.track(new THREE.PlaneGeometry(34, 1.6).rotateX(-Math.PI / 2)),
+    foamMaterial,
+  );
+  foam.position.set(0, 0.035, -4.2);
+  kit.group.add(foam);
+  return {
+    update: (elapsed) => {
+      texture.offset.y = (elapsed * 0.02) % 1;
+      texture.offset.x = Math.sin(elapsed * 0.05) * 0.02;
+      foamMaterial.opacity = 0.42 + Math.sin(elapsed * 1.1) * 0.12;
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Indoor room
 // ---------------------------------------------------------------------------
@@ -437,6 +500,10 @@ export function buildEnvironment(setting: SceneSetting): EnvironmentBuild {
   // Clouds only for bright outdoor weather that mentions them.
   if (!setting.indoor && !rainy && sunny) {
     updates.push(buildClouds(kit).update);
+  }
+  // The sea behind any coastal location.
+  if (!setting.indoor && /beach|sea|shore|coast|ocean/.test(setting.location.toLowerCase())) {
+    updates.push(buildOcean(kit).update);
   }
 
   const { group, dispose } = kit.build();
