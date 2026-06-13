@@ -364,8 +364,8 @@ const ACTION_POSES: [RegExp, PoseName][] = [
   [/drink|sipping|\bsip\b/, "drink"],
   [/jog|runn?ing|sprint/, "run"],
   [/checking|glanc/, "check"],
-  [/wip(e|ing)|steam|operat|clean|serv|pour/, "reach"],
-  [/sitting|seated|kneel/, "sit"],
+  [/wip(e|ing)|steam|operat|clean|serv|pour|reach|toss|throw|catch/, "reach"],
+  [/sitting|seated|kneel|doz|loung/, "sit"],
 ];
 
 function poseFor(action: string | undefined): PoseName {
@@ -377,15 +377,18 @@ function poseFor(action: string | undefined): PoseName {
 }
 
 /** Bends hips and knees onto a seat. Anchored figures sit on whatever the
- *  compiler placed them on; unanchored ones get a procedural box seat. */
+ *  compiler placed them on; unanchored ones get a procedural box seat —
+ *  unless `onGround` (kneeling/sitting on sand, grass, a towel...), where
+ *  they simply fold down onto the floor with no chair. */
 function foldSeated(
   kit: Kit,
   rig: PersonRig,
   parent: THREE.Group,
   anchored: boolean,
+  onGround = false,
 ) {
   let seatTop = 0;
-  if (!anchored) {
+  if (!anchored && !onGround) {
     // A simple café chair: legs + seat + back, facing the way they face.
     seatTop = 0.5;
     const wood = sharedMaterial({ color: 0x4a3a28, roughness: 0.8 });
@@ -569,12 +572,19 @@ export function buildPerson(
   // their hands are doing; sit/type and actions phrased as "sitting and
   // reading/drinking" imply sitting even on open ground.
   const anchored = entity.transform.position[1] > 0.1;
+  const action = (entity.action ?? "").toLowerCase();
   const seated =
     anchored ||
     pose === "sit" ||
     pose === "type" ||
-    /\bsitting\b|\bseated\b/.test((entity.action ?? "").toLowerCase());
-  if (seated) foldSeated(kit, rig, parent, anchored);
+    /\bsitting\b|\bseated\b/.test(action);
+  // Kneeling / sitting on the sand, grass, a towel or the floor folds the
+  // figure straight onto the ground rather than spawning a phantom chair.
+  const onGround =
+    /\bkneel|cross-legged|on the (sand|ground|grass|floor|beach|towel|blanket|mat|rug)/.test(
+      `${action} ${entity.descriptor.toLowerCase()}`,
+    );
+  if (seated) foldSeated(kit, rig, parent, anchored, onGround);
   const update = applyPose(kit, rig, pose, seated);
   return { rig, ...(update && !REDUCED_MOTION && { update }) };
 }

@@ -1433,9 +1433,244 @@ const buildShelf: ObjectBuilder = (kit, parent, entity) => {
   return undefined;
 };
 
+// ---------------------------------------------------------------------------
+// Beach dressing: parasol, palm, sandcastle, bucket, ball, cart, tower,
+// surfboard, sailboat. All seaside props for the beach scene.
+// ---------------------------------------------------------------------------
+
+// A big tilted parasol on a pole driven into the sand, with alternating
+// canopy panels for the classic seaside stripe.
+const buildBeachUmbrella: ObjectBuilder = (kit, parent, entity) => {
+  const pole = finish.wood(0xb08d57);
+  const a = finish.fabric(colorFromText(entity.descriptor, entity.id) || 0xb33a3a);
+  const b = finish.fabric(0xf2efe6);
+  const canopy = new THREE.Group();
+  canopy.position.y = 2.0;
+  canopy.rotation.z = 0.28; // leaning over the chairs
+  parent.add(canopy);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.028, 0.028, 4.0, 8)), pole, 0, 0, 0, canopy);
+  // Eight alternating wedges form the dome.
+  const wedge = kit.track(
+    new THREE.CylinderGeometry(0.9, 0.9, 0.34, 8, 1, true, 0, Math.PI / 4),
+  );
+  for (let i = 0; i < 8; i++) {
+    const panel = kit.mesh(wedge, i % 2 ? a : b, 0, 0.78, 0, canopy);
+    panel.rotation.y = (i / 8) * Math.PI * 2;
+    panel.scale.y = 0.9;
+  }
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.06, 8, 6)), pole, 0, 1.02, 0, canopy); // finial
+  return undefined;
+};
+
+// Palm parts cached per kit so a clump of palms shares one set.
+const palmCache = new WeakMap<Kit, { frond: THREE.BufferGeometry; coconut: THREE.SphereGeometry }>();
+function palmGeometryFor(kit: Kit) {
+  let g = palmCache.get(kit);
+  if (!g) {
+    g = {
+      frond: kit.track(new THREE.CapsuleGeometry(0.07, 1.1, 4, 8)),
+      coconut: kit.track(new THREE.SphereGeometry(0.09, 8, 6)),
+    };
+    palmCache.set(kit, g);
+  }
+  return g;
+}
+
+const buildPalm: ObjectBuilder = (kit, parent, entity) => {
+  const bark = woodMaterial(0x7a5a36, 0.95);
+  const frondMat = foliageMaterial(0x3f7d44);
+  const { frond, coconut } = palmGeometryFor(kit);
+  const lean = /lean/.test(entity.descriptor.toLowerCase()) ? 0.18 : 0.06;
+  const trunk = new THREE.Group();
+  trunk.rotation.z = lean;
+  parent.add(trunk);
+  // Curved trunk from stacked, narrowing segments.
+  const segGeometry = kit.track(new THREE.CylinderGeometry(0.13, 0.17, 0.6, 8));
+  for (let i = 0; i < 5; i++) {
+    const seg = kit.mesh(segGeometry, bark, i * 0.06, 0.3 + i * 0.58, 0, trunk);
+    seg.rotation.z = -i * 0.03;
+    seg.scale.setScalar(1 - i * 0.08);
+  }
+  const crown = new THREE.Group();
+  crown.position.set(0.3, 3.1, 0);
+  trunk.add(crown);
+  // A ring of drooping fronds.
+  for (let i = 0; i < 7; i++) {
+    const f = kit.mesh(frond, frondMat, 0, 0, 0, crown);
+    f.rotation.y = (i / 7) * Math.PI * 2;
+    f.rotation.z = 1.15; // splay outward and down
+    f.position.set(Math.sin((i / 7) * Math.PI * 2) * 0.5, 0, Math.cos((i / 7) * Math.PI * 2) * 0.5);
+  }
+  for (const [cx, cz] of [[0.1, 0.08], [-0.08, 0.06], [0.04, -0.1]]) {
+    kit.mesh(coconut, bark, cx, -0.05, cz, crown);
+  }
+  return undefined;
+};
+
+const buildSandcastle: ObjectBuilder = (kit, parent) => {
+  const sand = finish.stone(0xd9bf8f);
+  const turret = (x: number, z: number, h: number, r: number) => {
+    kit.mesh(kit.track(new THREE.CylinderGeometry(r, r * 1.25, h, 12)), sand, x, h / 2, z, parent);
+    kit.mesh(kit.track(new THREE.ConeGeometry(r * 1.1, r * 1.3, 12)), sand, x, h + r * 0.6, z, parent);
+  };
+  turret(-0.22, 0.05, 0.32, 0.14);
+  turret(0.22, -0.02, 0.34, 0.15);
+  turret(0, 0.18, 0.46, 0.17); // tallest, back centre
+  rbox(kit, sand, 0, 0.07, -0.06, 0.7, 0.14, 0.5, parent, 0.04); // base wall
+  // A little paper flag on the tall turret.
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 5)), finish.wood(0x8a6a3e), 0, 0.78, 0.18, parent);
+  const flag = kit.box(finish.fabric(0xb33a3a), 0.05, 0.82, 0.18, 0.1, 0.06, 0.004, false, parent);
+  flag.castShadow = false;
+  return undefined;
+};
+
+const buildBucket: ObjectBuilder = (kit, parent) => {
+  const red = finish.plastic(0xc23a32);
+  const blue = finish.plastic(0x3b6ea5);
+  // Bucket tipped on its side with a spilled lump of sand.
+  const bucket = new THREE.Group();
+  bucket.position.set(0, 0.13, 0);
+  bucket.rotation.z = 1.4;
+  parent.add(bucket);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.13, 0.1, 0.22, 14)), red, 0, 0, 0, bucket);
+  const handleGeometry = kit.track(new THREE.TorusGeometry(0.12, 0.012, 6, 14, Math.PI));
+  kit.mesh(handleGeometry, finish.metal(0x9aa0a8), 0, 0.02, 0, bucket);
+  // Spade: handle plus blade lying in the sand.
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.012, 0.012, 0.34, 6)), blue, 0.26, 0.04, 0.06, parent);
+  const blade = rbox(kit, blue, 0.42, 0.02, 0.06, 0.1, 0.02, 0.14, parent, 0.02);
+  blade.rotation.y = 0.3;
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.08, 8, 6)), finish.stone(0xd9bf8f), -0.16, 0.04, 0.02, parent);
+  return undefined;
+};
+
+const buildBeachBall: ObjectBuilder = (kit, parent) => {
+  // Striped panels via a canvas texture wrapped on a sphere.
+  const skin = surfaceMaterial(
+    "beachball", 256, 128,
+    (ctx, w, h) => {
+      const cols = ["#e23b3b", "#f2efe6", "#f2c037", "#3b8fd4", "#f2efe6", "#3fae5a"];
+      const seg = w / cols.length;
+      cols.forEach((c, i) => {
+        ctx.fillStyle = c;
+        ctx.fillRect(i * seg, 0, seg + 1, h);
+      });
+    },
+    { roughness: 0.4 },
+  );
+  const ball = kit.mesh(kit.track(new THREE.SphereGeometry(0.28, 20, 16)), skin, 0, 0.28, 0, parent);
+  return (t) => {
+    ball.position.y = 0.28 + Math.abs(Math.sin(t * 2.2)) * 0.5; // gentle bounce
+    ball.rotation.y = t * 0.6;
+  };
+};
+
+const buildIceCreamCart: ObjectBuilder = (kit, parent) => {
+  const body = finish.paint(0xf2efe6);
+  const trim = finish.paint(0x3b8fd4);
+  const dark = finish.plastic(0x2b2e33);
+  rbox(kit, body, 0, 0.62, 0, 1.0, 0.7, 0.62, parent, 0.04); // chest box
+  rbox(kit, trim, 0, 0.3, 0, 1.02, 0.12, 0.64, parent, 0.03); // skirt band
+  rbox(kit, dark, 0, 0.99, 0, 1.04, 0.08, 0.66, parent, 0.02); // lid
+  // Two wheels and a push handle.
+  const wheelGeometry = kit.track(new THREE.CylinderGeometry(0.16, 0.16, 0.05, 14).rotateZ(Math.PI / 2));
+  for (const x of [-0.42, 0.42]) {
+    kit.mesh(wheelGeometry, dark, x, 0.16, 0.34, parent);
+    kit.mesh(wheelGeometry, dark, x, 0.16, -0.34, parent);
+  }
+  const handleGeometry = kit.track(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8));
+  const handle = kit.mesh(handleGeometry, finish.metal(0x9aa0a8), -0.56, 0.8, 0, parent);
+  handle.rotation.z = 0.6;
+  // Candy-striped awning over the top.
+  const awning = surfaceMaterial(
+    "cart-awning", 128, 64,
+    (ctx, w, h) => {
+      const seg = w / 8;
+      for (let i = 0; i < 8; i++) {
+        ctx.fillStyle = i % 2 ? "#e23b3b" : "#f2efe6";
+        ctx.fillRect(i * seg, 0, seg + 1, h);
+      }
+    },
+    { roughness: 0.85 },
+  );
+  const canopy = rbox(kit, awning, 0, 1.34, 0.06, 1.16, 0.06, 0.8, parent, 0.02);
+  canopy.rotation.x = -0.12;
+  for (const x of [-0.5, 0.5]) {
+    kit.mesh(kit.track(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6)), finish.metal(0x9aa0a8), x, 1.15, 0.34, parent);
+  }
+  return undefined;
+};
+
+const buildLifeguardTower: ObjectBuilder = (kit, parent) => {
+  const wood = finish.wood(0xc9a25e);
+  const white = finish.paint(0xf2efe6);
+  const dark = finish.plastic(0x2b2e33);
+  // Four splayed stilts.
+  for (const [x, z] of [[-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45]]) {
+    const leg = kit.box(wood, x, 0.7, z, 0.08, 1.4, 0.08, false, parent);
+    leg.rotation.z = -Math.sign(x) * 0.07;
+    leg.rotation.x = -Math.sign(z) * 0.07;
+  }
+  rbox(kit, wood, 0, 1.42, 0, 1.2, 0.1, 1.2, parent, 0.03); // deck
+  // Cabin: three walls + a slanted roof, open toward the sea.
+  rbox(kit, white, 0, 1.95, -0.5, 1.1, 1.0, 0.08, parent, 0.03); // back wall
+  for (const x of [-0.5, 0.5]) {
+    rbox(kit, white, x, 1.95, 0, 0.08, 1.0, 1.0, parent, 0.03); // side walls
+  }
+  const roof = rbox(kit, finish.paint(0xc23a32), 0, 2.5, 0, 1.3, 0.08, 1.3, parent, 0.03);
+  roof.rotation.x = -0.14;
+  // A railing across the open front and a flag pole with a red flag.
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.015, 0.015, 1.1, 6).rotateZ(Math.PI / 2)), dark, 0, 1.75, 0.5, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 6)), dark, 0.6, 3.0, -0.5, parent);
+  kit.box(finish.fabric(0xc23a32), 0.78, 3.3, -0.5, 0.34, 0.22, 0.01, false, parent);
+  return undefined;
+};
+
+const buildSurfboard: ObjectBuilder = (kit, parent, entity) => {
+  const board = finish.plastic(colorFromText(entity.descriptor, entity.id) || 0xf2c037);
+  const stripe = finish.plastic(0xf2efe6);
+  // An upright board planted in the sand: a stretched, rounded slab.
+  const body = new THREE.Group();
+  body.position.set(0, 0.95, 0);
+  body.rotation.z = 0.12;
+  parent.add(body);
+  const slab = rbox(kit, board, 0, 0, 0, 0.42, 1.9, 0.08, body, 0.2);
+  slab.scale.y = 1; // already long
+  kit.box(stripe, 0, 0, 0.045, 0.04, 1.7, 0.02, false, body); // centre stringer
+  return undefined;
+};
+
+const buildSailboat: ObjectBuilder = (kit, parent) => {
+  const hull = finish.paint(0xf2efe6);
+  const sailMat = finish.fabric(0xf2efe6);
+  const accent = finish.paint(0xc23a32);
+  const boat = new THREE.Group();
+  parent.add(boat);
+  // Hull: a stretched half-capsule sitting low on the water.
+  const hullMesh = kit.mesh(kit.track(new THREE.CapsuleGeometry(0.22, 0.7, 4, 10).rotateZ(Math.PI / 2)), hull, 0, 0.16, 0, boat);
+  hullMesh.scale.set(1, 0.55, 0.5);
+  kit.box(accent, 0, 0.26, 0, 1.0, 0.04, 0.26, false, boat); // deck stripe
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.02, 0.02, 1.3, 6)), finish.wood(0x8a6a3e), 0, 0.9, 0, boat); // mast
+  // Triangular mainsail from a thin tapered cone wedge.
+  const sail = kit.mesh(kit.track(new THREE.ConeGeometry(0.34, 1.1, 3)), sailMat, 0.12, 0.92, 0, boat);
+  sail.scale.set(0.5, 1, 1);
+  return (t) => {
+    boat.rotation.z = Math.sin(t * 0.5) * 0.04; // gentle rock
+    boat.position.y = Math.sin(t * 0.7) * 0.03;
+  };
+};
+
 // Ordered: more specific phrases before generic ones.
 const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/umbrella stand/, buildUmbrellaStand],
+  [/beach umbrella|parasol/, buildBeachUmbrella],
+  [/sandcastle|sand castle/, buildSandcastle],
+  [/bucket|spade|pail/, buildBucket],
+  [/beach ?ball/, buildBeachBall],
+  [/ice.?cream cart|\bcart\b/, buildIceCreamCart],
+  [/lifeguard|watchtower/, buildLifeguardTower],
+  [/surfboard|surf board/, buildSurfboard],
+  [/sailboat|sail boat|dinghy|\byacht\b/, buildSailboat],
+  [/\bpalm\b/, buildPalm],
   [/stop sign|bus sign|street sign/, buildSign],
   // "lamp hanging over the tables" must not hit the table builder; the
   // generic /lamp/ further down covers freestanding lamps.
@@ -1474,7 +1709,7 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/table|desk/, buildTable],
   [/pond|lake/, buildPond],
   [/bush|shrub|hedge/, buildBushes],
-  [/blanket|picnic mat|\brug\b/, buildPicnicMat],
+  [/blanket|towel|picnic mat|\brug\b/, buildPicnicMat],
   [/basket|hamper/, buildBasket],
   [/\bdog\b|puppy/, buildDog],
   [/briefcase|suitcase/, buildBriefcase],
