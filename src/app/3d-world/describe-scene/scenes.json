@@ -496,5 +496,196 @@
       }
     },
     "model_answer": "This picture shows an ordinary city bus stop on a clear afternoon, but something very strange is happening. In the middle of the queue, a man is waiting for the bus dressed in a full scuba wetsuit, with a diving mask on his face and flippers on his feet, calmly holding a transit pass. This is bizarre because there is no water anywhere nearby — scuba gear belongs in the ocean, and it would be almost impossible to climb onto a bus wearing flippers. The people around him have clearly noticed: the woman in a trench coat at the front of the queue keeps glancing sideways at him while pretending to check her watch, and the teenager behind him is openly taking a photo with his phone. Behind them is a normal glass bus shelter with a route map, a metal bench with someone's briefcase on it, and a route 42 sign at the kerb, which makes the diver stand out even more. Perhaps he lost a bet, or he is on his way to a costume party."
+  },
+  {
+    "id": "beach-afternoon",
+    "task": 3,
+    "title": "A Sunny Afternoon at the Beach",
+    "difficulty": "medium",
+    "setting": {
+      "location": "a sandy beach by the sea",
+      "time_of_day": "late afternoon",
+      "weather": "sunny with a few clouds",
+      "indoor": false
+    },
+    "people": [
+      {
+        "id": "p_swimmer",
+        "description": "a woman in a red swimsuit",
+        "action": "wading into the sea with her arms out",
+        "position": "background centre"
+      },
+      {
+        "id": "p_reader",
+        "description": "a woman in a wide sunhat",
+        "action": "sitting reading a magazine",
+        "position": "in the foreground, on the striped beach chair"
+      },
+      {
+        "id": "p_boy",
+        "description": "a small boy in blue swim trunks",
+        "action": "kneeling and patting a sandcastle",
+        "position": "foreground left, next to the sandcastle, on the left"
+      },
+      {
+        "id": "p_vendor",
+        "description": "an ice-cream vendor in a white apron",
+        "action": "leaning out to serve a cone",
+        "position": "background left, behind the ice-cream cart"
+      },
+      {
+        "id": "p_surfer",
+        "description": "a young man in a black wetsuit",
+        "action": "walking down to the sea",
+        "position": "midground right"
+      },
+      {
+        "id": "p_baller",
+        "description": "a man in green board shorts",
+        "action": "tossing a beach ball overhead",
+        "position": "midground left"
+      },
+      {
+        "id": "p_jogger",
+        "description": "a woman in a yellow tank top",
+        "action": "jogging along the shoreline",
+        "position": "background right"
+      },
+      {
+        "id": "p_grandpa",
+        "description": "an elderly man in a straw hat",
+        "action": "dozing in a deck chair",
+        "position": "in the foreground, on the blue beach chair"
+      }
+    ],
+    "objects": [
+      {
+        "id": "o_umbrella",
+        "name": "beach umbrella",
+        "position": "foreground right",
+        "detail": "a large red and white striped parasol leaning over the chairs"
+      },
+      {
+        "id": "o_chair_striped",
+        "name": "striped beach chair",
+        "position": "foreground right, beside the umbrella, on the right",
+        "detail": "a folding deck chair in faded red and white stripes"
+      },
+      {
+        "id": "o_chair_blue",
+        "name": "blue beach chair",
+        "position": "foreground right, beside the umbrella, on the left",
+        "detail": "a folding deck chair in plain navy canvas"
+      },
+      {
+        "id": "o_towel",
+        "name": "beach towel",
+        "position": "foreground right, in front of the umbrella",
+        "detail": "a yellow towel spread flat on the sand"
+      },
+      {
+        "id": "o_sandcastle",
+        "name": "sandcastle",
+        "position": "foreground left",
+        "detail": "three lumpy turrets with a tiny paper flag on top"
+      },
+      {
+        "id": "o_bucket",
+        "name": "bucket and spade",
+        "position": "foreground left, next to the sandcastle, on the right",
+        "detail": "a small red bucket tipped over beside a blue spade"
+      },
+      {
+        "id": "o_beachball",
+        "name": "beach ball",
+        "position": "midground left",
+        "detail": "a colourful panelled ball mid-bounce on the sand"
+      },
+      {
+        "id": "o_cart",
+        "name": "ice-cream cart",
+        "position": "background left",
+        "detail": "a little wheeled cart with a candy-striped awning"
+      },
+      {
+        "id": "o_palm",
+        "name": "palm tree",
+        "position": "far background left",
+        "detail": "a tall palm leaning slightly toward the water"
+      },
+      {
+        "id": "o_lifeguard",
+        "name": "lifeguard tower",
+        "position": "far background right",
+        "detail": "a raised wooden hut on stilts with a red flag"
+      },
+      {
+        "id": "o_surfboard",
+        "name": "surfboard",
+        "position": "midground right",
+        "detail": "a yellow board standing upright, planted in the sand"
+      },
+      {
+        "id": "o_sailboat",
+        "name": "sailboat",
+        "position": "far background",
+        "detail": "a small white sailboat out on the water"
+      }
+    ],
+    "spatial_relationships": [
+      {
+        "subject": "p_reader",
+        "relation": "is sitting on",
+        "target": "o_chair_striped"
+      },
+      {
+        "subject": "p_grandpa",
+        "relation": "is sitting on",
+        "target": "o_chair_blue"
+      },
+      {
+        "subject": "o_chair_blue",
+        "relation": "is under",
+        "target": "o_umbrella"
+      },
+      {
+        "subject": "o_towel",
+        "relation": "is beside",
+        "target": "o_chair_striped"
+      },
+      {
+        "subject": "p_boy",
+        "relation": "is kneeling beside",
+        "target": "o_sandcastle"
+      },
+      {
+        "subject": "o_bucket",
+        "relation": "is beside",
+        "target": "o_sandcastle"
+      },
+      {
+        "subject": "p_vendor",
+        "relation": "is serving from",
+        "target": "o_cart"
+      },
+      {
+        "subject": "p_baller",
+        "relation": "is playing with",
+        "target": "o_beachball"
+      },
+      {
+        "subject": "o_sailboat",
+        "relation": "is sailing far beyond",
+        "target": "o_lifeguard"
+      }
+    ],
+    "anomaly": null,
+    "elements": {
+      "counts": {
+        "people": 8,
+        "objects": 12
+      }
+    },
+    "model_answer": "This picture shows a busy sandy beach on a sunny late afternoon. In the foreground on the right, an elderly man in a straw hat is dozing in a navy deck chair under a big red and white striped umbrella, while next to him a woman in a wide sunhat sits in a striped chair reading a magazine, with a yellow towel spread on the sand beside her. On the left in the foreground, a small boy in blue trunks kneels to pat a lumpy sandcastle topped with a little flag, his bucket and spade tipped over next to it. In the middle of the scene a man in green shorts tosses a beach ball, and on the right a young man in a wetsuit walks down toward the water past his surfboard standing upright in the sand. Further back, a woman in a red swimsuit wades into the sea, a jogger runs along the shoreline by a wooden lifeguard tower, and an ice-cream vendor leans out of his striped cart to serve a cone, with a tall palm leaning over the sand. Far out on the water a small white sailboat drifts past, and overall it looks like a relaxed, happy day at the seaside."
   }
 ]
