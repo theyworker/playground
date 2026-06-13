@@ -584,6 +584,170 @@ const buildLamp: ObjectBuilder = (kit, parent) => {
   return undefined;
 };
 
+// ---------------------------------------------------------------------------
+// City street furniture (bus-stop set).
+// ---------------------------------------------------------------------------
+
+// Picks the first color word in the descriptor, else a default tint.
+function tintOr(entity: PlacedEntity, fallback: number): number {
+  const text = entity.descriptor.toLowerCase();
+  let earliest = Infinity;
+  let tint = fallback;
+  for (const [pattern, color] of COLOR_WORDS) {
+    const match = pattern.exec(text);
+    if (match && match.index < earliest) {
+      earliest = match.index;
+      tint = color;
+    }
+  }
+  return tint;
+}
+
+const buildLitterBin: ObjectBuilder = (kit, parent, entity) => {
+  const shell = finish.metal(tintOr(entity, 0x55595f));
+  const dark = finish.plastic(0x26282c);
+  // Tapered drum with a domed hood and a slot opening at the front.
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.23, 0.2, 0.6, 18)), shell, 0, 0.31, 0, parent);
+  kit.mesh(
+    kit.track(new THREE.TorusGeometry(0.23, 0.022, 8, 22).rotateX(Math.PI / 2)),
+    shell, 0, 0.6, 0, parent,
+  );
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.22, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2)), shell, 0, 0.61, 0, parent);
+  // Dark recessed opening on the camera-facing side.
+  const slot = kit.box(dark, 0, 0.6, 0.18, 0.26, 0.12, 0.12, false, parent);
+  slot.rotation.x = 0.3;
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 18)), dark, 0, 0.03, 0, parent);
+  return undefined;
+};
+
+const buildStreetLamp: ObjectBuilder = (kit, parent) => {
+  const metal = finish.iron(0x3c3f45);
+  const glass = finish.glass(0xf3ead0);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.16, 0.2, 0.14, 14)), metal, 0, 0.07, 0, parent); // base
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.05, 0.07, 3.2, 10)), metal, 0, 1.74, 0, parent); // pole
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.11, 0.07, 0.12, 12)), metal, 0, 3.4, 0, parent); // collar
+  // Tapered lantern housing with glass panels and a little finial.
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.14, 0.18, 0.32, 6)), glass, 0, 3.62, 0, parent);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.18, 0.06, 0.16, 6)), metal, 0, 3.85, 0, parent); // cap
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.035, 8, 6)), metal, 0, 3.96, 0, parent); // finial
+  return undefined;
+};
+
+const buildHydrant: ObjectBuilder = (kit, parent, entity) => {
+  const paint = finish.paint(tintOr(entity, 0xb33a3a));
+  const cap = finish.metal(0x9aa0a8);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.13, 0.16, 0.34, 14)), paint, 0, 0.17, 0, parent); // body
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.15, 0.15, 0.06, 14)), paint, 0, 0.05, 0, parent); // foot flange
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.135, 14, 10)), paint, 0, 0.36, 0, parent); // dome
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.045, 0.05, 0.06, 8)), cap, 0, 0.45, 0, parent); // top bolt
+  // Side and front nozzles with cap plates.
+  const nozzle = kit.track(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 10).rotateZ(Math.PI / 2));
+  for (const side of [-1, 1]) {
+    kit.mesh(nozzle, cap, side * 0.17, 0.26, 0, parent);
+  }
+  const front = kit.track(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 10).rotateX(Math.PI / 2));
+  kit.mesh(front, cap, 0, 0.18, 0.16, parent);
+  return undefined;
+};
+
+const buildBollards: ObjectBuilder = (kit, parent, entity) => {
+  const post = finish.iron(tintOr(entity, 0x2f3237));
+  const band = finish.paint(0xd9b832);
+  const capGeometry = kit.track(new THREE.SphereGeometry(0.07, 10, 8));
+  const postGeometry = kit.track(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 12));
+  const bandGeometry = kit.track(new THREE.CylinderGeometry(0.072, 0.072, 0.06, 12));
+  // A short row of three kerbside posts with a reflective band.
+  for (const x of [-0.62, 0, 0.62]) {
+    kit.mesh(postGeometry, post, x, 0.3, 0, parent);
+    kit.mesh(bandGeometry, band, x, 0.5, 0, parent);
+    kit.mesh(capGeometry, post, x, 0.6, 0, parent);
+  }
+  return undefined;
+};
+
+const buildCone: ObjectBuilder = (kit, parent) => {
+  const orange = finish.plastic(0xe2691c);
+  const white = finish.plastic(0xece8e0);
+  kit.mesh(kit.track(new THREE.BoxGeometry(0.26, 0.03, 0.26)), orange, 0, 0.015, 0, parent); // base
+  kit.mesh(kit.track(new THREE.ConeGeometry(0.115, 0.42, 16)), orange, 0, 0.24, 0, parent);
+  // Reflective collar: a short cone slice in white.
+  kit.mesh(kit.track(new THREE.ConeGeometry(0.082, 0.08, 16)), white, 0, 0.29, 0, parent);
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.03, 8, 6)), orange, 0, 0.45, 0, parent); // tip
+  return undefined;
+};
+
+const buildPostbox: ObjectBuilder = (kit, parent, entity) => {
+  const paint = finish.paint(tintOr(entity, 0xb33a3a));
+  const dark = finish.plastic(0x26282c);
+  const plate = finish.metal(0xc9ccd1);
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 18)), dark, 0, 0.04, 0, parent); // base
+  kit.mesh(kit.track(new THREE.CylinderGeometry(0.28, 0.28, 1.0, 18)), paint, 0, 0.58, 0, parent); // pillar
+  kit.mesh(kit.track(new THREE.SphereGeometry(0.28, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2)), paint, 0, 1.08, 0, parent); // domed cap
+  const slot = kit.box(dark, 0, 0.92, 0.27, 0.26, 0.04, 0.05, false, parent); // posting slot
+  slot.rotation.x = 0.05;
+  kit.box(plate, 0, 0.66, 0.275, 0.22, 0.14, 0.02, false, parent); // collection plate
+  return undefined;
+};
+
+const buildBikeRack: ObjectBuilder = (kit, parent) => {
+  const metal = finish.metal(0x868c93);
+  // Three inverted-U hoops set in a row.
+  const hoopGeometry = kit.track(new THREE.TorusGeometry(0.28, 0.025, 8, 18, Math.PI));
+  const footGeometry = kit.track(new THREE.CylinderGeometry(0.03, 0.03, 0.1, 8));
+  for (const x of [-0.55, 0, 0.55]) {
+    const hoop = kit.mesh(hoopGeometry, metal, x, 0.5, 0, parent);
+    hoop.rotation.z = 0; // arch opens downward
+    for (const side of [-1, 1]) {
+      kit.mesh(footGeometry, metal, x + side * 0.28, 0.05, 0, parent);
+    }
+  }
+  return undefined;
+};
+
+const buildPigeons: ObjectBuilder = (kit, parent) => {
+  const bodyMat = finish.fabric(0x8a8f96);
+  const headMat = finish.fabric(0x5d6168);
+  const beakMat = finish.plastic(0xd98c43);
+  const footMat = finish.plastic(0xc06a4a);
+  const bodyGeometry = kit.track(new THREE.CapsuleGeometry(0.05, 0.08, 4, 8).rotateZ(Math.PI / 2));
+  const headGeometry = kit.track(new THREE.SphereGeometry(0.035, 10, 8));
+  const beakGeometry = kit.track(new THREE.ConeGeometry(0.012, 0.04, 6).rotateX(Math.PI / 2));
+  const tailGeometry = kit.track(new THREE.BoxGeometry(0.05, 0.012, 0.07));
+  const footGeometry = kit.track(new THREE.CylinderGeometry(0.005, 0.005, 0.05, 5));
+  const birds: { head: THREE.Group; phase: number }[] = [];
+  const spots: [number, number, number][] = [
+    [0, 0, 0.2],
+    [0.34, 0.2, 1.1],
+    [-0.26, -0.18, -0.6],
+  ];
+  spots.forEach(([x, z, yaw], i) => {
+    const bird = new THREE.Group();
+    bird.position.set(x, 0, z);
+    bird.rotation.y = yaw;
+    parent.add(bird);
+    kit.mesh(bodyGeometry, bodyMat, 0, 0.09, 0, bird);
+    kit.mesh(tailGeometry, bodyMat, 0, 0.1, -0.09, bird);
+    for (const side of [-1, 1]) {
+      kit.mesh(footGeometry, footMat, side * 0.02, 0.025, 0, bird);
+    }
+    // Head on a short neck pivot so it can peck.
+    const head = new THREE.Group();
+    head.position.set(0, 0.13, 0.07);
+    bird.add(head);
+    kit.mesh(headGeometry, headMat, 0, 0, 0, head);
+    kit.mesh(beakGeometry, beakMat, 0, -0.005, 0.04, head);
+    birds.push({ head, phase: i * 2.1 });
+  });
+  return (t) => {
+    for (const { head, phase } of birds) {
+      // Quick downward peck on a loose cycle.
+      const peck = Math.max(0, Math.sin(t * 3 + phase));
+      head.rotation.x = peck * 0.9;
+      head.position.y = 0.13 - peck * 0.04;
+    }
+  };
+};
+
 // A closed umbrella for the stand: folded canopy, ferrule down, hook up.
 const buildClosedUmbrella = (kit: Kit, parent: THREE.Group, tint: number) => {
   const metal = finish.iron(0x4a4d52);
@@ -1098,13 +1262,23 @@ const OBJECT_BUILDERS: [RegExp, ObjectBuilder][] = [
   [/path|trail|walkway/, buildPath],
   [/fountain/, buildFountain],
   [/grove|stand of trees|\btrees\b/, buildTreeCluster],
-  [/tree|oak/, buildTree],
+  // Word-bounded so "s-tree-t lamp" doesn't read as a tree.
+  [/\btree\b|\boak\b/, buildTree],
   [/counter/, buildCounter],
   [/espresso|machine/, buildMachine],
   [/pastry|display case|glass case/, buildDisplayCase],
   [/menu|chalkboard|board|sign/, buildBoard],
   [/chair|stool/, buildChair],
+  // Street furniture: specific names before the generic indoor lamp.
+  [/street ?lamp|lamp ?post|lamppost|street ?light/, buildStreetLamp],
   [/lamp/, buildLamp],
+  [/litter|\bbin\b|rubbish|trash|waste|recycl/, buildLitterBin],
+  [/hydrant/, buildHydrant],
+  [/bollard/, buildBollards],
+  [/traffic cone|\bcone\b/, buildCone],
+  [/post ?box|postbox|mail ?box|pillar box/, buildPostbox],
+  [/bike rack|bicycle rack|cycle rack|bike stand/, buildBikeRack],
+  [/pigeon|\bbirds?\b|sparrow/, buildPigeons],
   [/table|desk/, buildTable],
   [/pond|lake/, buildPond],
   [/bush|shrub|hedge/, buildBushes],

@@ -330,6 +330,66 @@
         "name": "leather briefcase",
         "position": "on the bench",
         "detail": "left unattended next to a folded jacket"
+      },
+      {
+        "id": "o_litter_bin",
+        "name": "litter bin",
+        "position": "background right",
+        "detail": "a dented metal litter bin with a domed hood"
+      },
+      {
+        "id": "o_recycling_bin",
+        "name": "green recycling bin",
+        "position": "next to the litter bin, on the right",
+        "detail": "a green recycling bin beside it"
+      },
+      {
+        "id": "o_street_lamp",
+        "name": "street lamp",
+        "position": "far background left",
+        "detail": "a tall cast-iron street lamp with a glass lantern"
+      },
+      {
+        "id": "o_post_box",
+        "name": "red post box",
+        "position": "far background right",
+        "detail": "a red pillar post box with a posting slot"
+      },
+      {
+        "id": "o_fire_hydrant",
+        "name": "fire hydrant",
+        "position": "background left",
+        "detail": "a squat red fire hydrant with side nozzles"
+      },
+      {
+        "id": "o_planter",
+        "name": "stone planter",
+        "position": "midground right",
+        "detail": "a planter of green shrubs by the kerb"
+      },
+      {
+        "id": "o_bike_rack",
+        "name": "bike rack",
+        "position": "next to the planter, on the right",
+        "detail": "a row of metal bike rack hoops"
+      },
+      {
+        "id": "o_bollards",
+        "name": "row of bollards",
+        "position": "midground centre",
+        "detail": "short black bollards with yellow reflective bands along the kerb"
+      },
+      {
+        "id": "o_traffic_cone",
+        "name": "traffic cone",
+        "position": "next to the bollards, on the right",
+        "detail": "a lone orange traffic cone"
+      },
+      {
+        "id": "o_pigeons",
+        "name": "pigeons",
+        "position": "in front of the shelter bench",
+        "detail": "a couple of grey pigeons pecking at the pavement"
       }
     ],
     "spatial_relationships": [
@@ -357,6 +417,31 @@
         "subject": "o_stop_sign",
         "relation": "is to the left of",
         "target": "o_bus_shelter"
+      },
+      {
+        "subject": "o_recycling_bin",
+        "relation": "is next to",
+        "target": "o_litter_bin"
+      },
+      {
+        "subject": "o_fire_hydrant",
+        "relation": "is to the left of",
+        "target": "o_bus_shelter"
+      },
+      {
+        "subject": "o_bollards",
+        "relation": "is in front of",
+        "target": "o_bus_shelter"
+      },
+      {
+        "subject": "o_bike_rack",
+        "relation": "is next to",
+        "target": "o_planter"
+      },
+      {
+        "subject": "o_pigeons",
+        "relation": "are in front of",
+        "target": "o_bench"
       }
     ],
     "anomaly": {
@@ -368,9 +453,9 @@
     "elements": {
       "counts": {
         "people": 3,
-        "objects": 4
+        "objects": 14
       }
     },
-    "model_answer": "This picture shows an ordinary city bus stop on a clear afternoon, but something very strange is happening. In the middle of the queue, a man is waiting for the bus dressed in a full scuba wetsuit, with a diving mask on his face and flippers on his feet, calmly holding a transit pass. This is bizarre because there is no water anywhere nearby — scuba gear belongs in the ocean, and it would be almost impossible to climb onto a bus wearing flippers. The people around him have clearly noticed: the woman in a trench coat at the front of the queue keeps glancing sideways at him while pretending to check her watch, and the teenager behind him is openly taking a photo with his phone. Behind them is a normal glass bus shelter with a route map, a metal bench with someone's briefcase on it, and a route 42 sign at the kerb, which makes the diver stand out even more. Perhaps he lost a bet, or he is on his way to a costume party."
+    "model_answer": "This picture shows an ordinary city bus stop on a clear afternoon, but something very strange is happening. In the middle of the queue, a man is waiting for the bus dressed in a full scuba wetsuit, with a diving mask on his face and flippers on his feet, calmly holding a transit pass. This is bizarre because there is no water anywhere nearby — scuba gear belongs in the ocean, and it would be almost impossible to climb onto a bus wearing flippers. The people around him have clearly noticed: the woman in a trench coat at the front of the queue keeps glancing sideways at him while pretending to check her watch, and the teenager behind him is openly taking a photo with his phone. Behind them is a normal glass bus shelter with a route map, a metal bench with someone's briefcase on it, and a route 42 sign at the kerb. The street around them is full of ordinary city details — a litter bin and a green recycling bin to the right, a tall street lamp and a red post box further back, a fire hydrant, a stone planter of shrubs and a row of bike racks by the kerb, a line of black-and-yellow bollards with a stray traffic cone, and a few pigeons pecking at the pavement — all of which makes the diver stand out even more. Perhaps he lost a bet, or he is on his way to a costume party."
   }
 ]
