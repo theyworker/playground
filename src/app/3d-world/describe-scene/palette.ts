@@ -34,6 +34,13 @@ export const SKIN_TONES = [
   0xf1c6a7, 0xe3a983, 0xd99b6c, 0xc98a5e, 0xa9714b, 0x8d5a3b, 0x6f4530,
 ];
 
+/** Natural hair/beard tones: black, dark brown, brown, auburn, blonde,
+ *  sandy. Grey/white are reserved for elderly figures (see grooming). */
+export const HAIR_TONES = [
+  0x1c1a18, 0x3b2a1d, 0x5d4023, 0x6e3b27, 0xb78a4e, 0xc8a96a,
+];
+export const HAIR_GREY = 0x9a958c;
+
 /** Deterministic palette pick, seeded so the same id always dresses alike. */
 export function pick(palette: number[], seed: string): number {
   return palette[Math.floor(hash01(seed) * palette.length) % palette.length];
