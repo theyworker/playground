@@ -153,3 +153,130 @@ export function computeWeightedScore(
   const score = possible === 0 ? 0 : Math.round((earned / possible) * 100);
   return { score, earned, possible };
 }
+
+// --- Feedback: grouped breakdown, band estimate, and coaching copy ----------
+
+export type BreakdownKey = "people" | "actions" | "objects" | "spatial" | "setting";
+
+export interface BreakdownItem {
+  id: string;
+  /** Manifest phrasing the learner could have used. */
+  text: string;
+  matched: boolean;
+  /** The judge's short justification, if any. */
+  evidence?: string;
+}
+
+export interface BreakdownGroup {
+  key: BreakdownKey;
+  label: string;
+  items: BreakdownItem[];
+}
+
+const GROUP_ORDER: { key: BreakdownKey; label: string; kinds: ScorableKind[] }[] = [
+  { key: "people", label: "People", kinds: ["person"] },
+  { key: "actions", label: "Actions", kinds: ["action"] },
+  { key: "objects", label: "Objects", kinds: ["object"] },
+  { key: "spatial", label: "Spatial relationships", kinds: ["spatial"] },
+  { key: "setting", label: "Setting", kinds: ["setting"] },
+];
+
+/** Joins the scorable manifest with the judge's verdicts, grouped by category
+ *  for the feedback panel. The anomaly is reported separately (it has its own
+ *  noticed/explained channel). */
+export function buildBreakdown(
+  scene: SceneSpec,
+  result: ScoreResult,
+): BreakdownGroup[] {
+  const scorables = buildScorables(scene);
+  const byId = new Map(result.matches.map((m) => [m.id, m]));
+  return GROUP_ORDER.map((group) => ({
+    key: group.key,
+    label: group.label,
+    items: scorables
+      .filter((s) => group.kinds.includes(s.kind))
+      .map((s) => {
+        const match = byId.get(s.id);
+        return {
+          id: s.id,
+          text: s.text,
+          matched: match?.matched ?? false,
+          evidence: match?.evidence,
+        };
+      }),
+  })).filter((group) => group.items.length > 0);
+}
+
+export interface CelpipBand {
+  /** e.g. "9-10". An estimate, not an official score. */
+  band: string;
+  descriptor: string;
+}
+
+/** Rough CELPIP-style band from the 0-100 weighted score. Clearly an estimate. */
+export function celpipBand(score: number): CelpipBand {
+  if (score >= 90) return { band: "10-12", descriptor: "Advanced" };
+  if (score >= 78) return { band: "8-9", descriptor: "Strong" };
+  if (score >= 66) return { band: "7", descriptor: "Good" };
+  if (score >= 54) return { band: "5-6", descriptor: "Adequate" };
+  if (score >= 42) return { band: "4", descriptor: "Developing" };
+  return { band: "3 or below", descriptor: "Needs work" };
+}
+
+const NUMBER_WORDS = [
+  "zero", "one", "two", "three", "four", "five", "six",
+  "seven", "eight", "nine", "ten", "eleven", "twelve",
+];
+
+function word(n: number): string {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
+function categoryNoun(key: BreakdownKey, count: number): string {
+  const plural = count !== 1;
+  switch (key) {
+    case "people":
+      return plural ? "people" : "person";
+    case "actions":
+      return plural ? "actions" : "action";
+    case "objects":
+      return plural ? "objects" : "object";
+    case "spatial":
+      return plural ? "spatial details" : "spatial detail";
+    case "setting":
+      return plural ? "setting details" : "setting detail";
+  }
+}
+
+/** One specific, active line of coaching pointed at the biggest weakness. */
+export function coachingLine(
+  scene: SceneSpec,
+  breakdown: BreakdownGroup[],
+  result: ScoreResult,
+): string {
+  const taskLabel = scene.task === 8 ? "Task 8" : "Task 3";
+
+  if (scene.anomaly) {
+    if (!result.anomaly?.noticed) {
+      return "You didn't flag the unusual element — on Task 8 that's the whole task.";
+    }
+    if (!result.anomaly?.explained) {
+      return "You spotted the odd thing but didn't say why it's out of place — Task 8 wants the explanation.";
+    }
+  }
+
+  let worst: BreakdownGroup | null = null;
+  let worstMissed = 0;
+  for (const group of breakdown) {
+    const missed = group.items.filter((item) => !item.matched).length;
+    if (missed > worstMissed) {
+      worst = group;
+      worstMissed = missed;
+    }
+  }
+
+  if (!worst || worstMissed === 0) {
+    return "Thorough, well-organised description — you covered the scene fully.";
+  }
+  return `You missed ${word(worstMissed)} ${categoryNoun(worst.key, worstMissed)} — that's where ${taskLabel} loses marks.`;
+}

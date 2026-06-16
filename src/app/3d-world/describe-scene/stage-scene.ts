@@ -10,7 +10,9 @@ import {
   setTextureAnisotropy,
   skyTexture,
 } from "./textures";
+import { buildHighlight, HighlightHandle } from "./highlight";
 import type { SceneSpec } from "./types";
+import type { ScoreResult } from "./scoring";
 
 export interface SceneReport {
   /** Descriptors that rendered as the placeholder fallback (asset gaps). */
@@ -20,6 +22,10 @@ export interface SceneReport {
 export interface StageHandle {
   /** Compiles and displays a scene; the stage itself persists. */
   setScene(scene: SceneSpec): SceneReport;
+  /** Lights up matched meshes and greys missed ones from a scoring result. */
+  applyScore(scene: SceneSpec, result: ScoreResult): void;
+  /** Removes any active light-up, restoring the scene's normal materials. */
+  clearScore(): void;
   dispose(): void;
 }
 
@@ -99,8 +105,15 @@ export function createStageScene(container: HTMLElement): StageHandle {
 
   let content: BuiltScene | null = null;
   let environment: EnvironmentBuild | null = null;
+  let highlight: HighlightHandle | null = null;
+
+  const clearScore = () => {
+    highlight?.dispose();
+    highlight = null;
+  };
 
   const setScene = (spec: SceneSpec): SceneReport => {
+    clearScore();
     if (content) {
       scene.remove(content.group);
       content.dispose();
@@ -142,6 +155,15 @@ export function createStageScene(container: HTMLElement): StageHandle {
     return { fallbacks: content.fallbacks };
   };
 
+  const applyScore = (spec: SceneSpec, result: ScoreResult) => {
+    clearScore();
+    if (!content) return;
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    highlight = buildHighlight(content.group, spec, result, reducedMotion);
+  };
+
   const clock = new THREE.Clock();
   let frame = 0;
   const animate = () => {
@@ -149,6 +171,7 @@ export function createStageScene(container: HTMLElement): StageHandle {
     const elapsed = clock.getElapsedTime();
     content?.update(elapsed);
     environment?.update(elapsed);
+    highlight?.update(elapsed);
     controls.update();
     renderer.render(scene, camera);
   };
@@ -163,9 +186,12 @@ export function createStageScene(container: HTMLElement): StageHandle {
 
   return {
     setScene,
+    applyScore,
+    clearScore,
     dispose: () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
+      clearScore();
       controls.dispose();
       content?.dispose();
       environment?.dispose();
