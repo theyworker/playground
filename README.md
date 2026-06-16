@@ -20,6 +20,21 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Describe the Scene (env vars)
+
+The `/3d-world/describe-scene` drill records a spoken description, transcribes
+it, and scores it with OpenAI. Add these to `.env.local` (never commit real
+keys — `.env*` is gitignored):
+
+```bash
+OPENAI_API_KEY=sk-...            # required; server-only, never sent to the client
+OPENAI_TRANSCRIBE_MODEL=gpt-4o-transcribe   # optional; default favours accuracy
+OPENAI_SCORING_MODEL=gpt-4o      # optional; must support strict json_schema outputs
+```
+
+The page itself stays statically prerendered; `/api/transcribe` and
+`/api/score` are dynamic server routes that hold the key.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
