@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { loadScenes } from "./types";
 import type { StageHandle } from "./stage-scene";
+import DescribePanel from "./describe-panel";
 
 // Validated at module load so a bad scenes.json fails the build, not the
 // learner mid-drill.
@@ -101,6 +102,9 @@ export default function DescribeScenePage() {
           </ul>
         </aside>
       )}
+
+      {/* Record -> transcribe -> score, with the weighted result inline. */}
+      <DescribePanel key={scene.id} scene={scene} />
 
       <p className="pointer-events-none absolute bottom-6 right-6 text-xs text-slate-400">
         {scene.title} &middot; Task {scene.task} &middot; {scene.difficulty}{" "}

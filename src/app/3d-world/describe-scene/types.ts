@@ -59,6 +59,15 @@ export interface SceneSpec {
   spatial_relationships: SpatialRelationship[];
   anomaly: SceneAnomaly | null;
   elements: SceneElements;
+  /**
+   * Exhaustive prose answer key used for scoring: the prose form of every
+   * structured fact above (setting, each person with action + position, each
+   * object with position + detail, every spatial relationship, and — for
+   * Task 8 — the anomaly and why it is unusual). Stays consistent with the
+   * structured elements; nothing a learner could correctly say is absent.
+   */
+  ground_truth_description: string;
+  /** Natural sample answer shown to the learner later (not the grading key). */
   model_answer: string;
 }
 
@@ -185,6 +194,11 @@ function parseScene(value: unknown, index: number): SceneSpec {
     spatial_relationships: parseRelationships(id, value.spatial_relationships),
     anomaly: parseAnomaly(id, "anomaly" in value ? value.anomaly : undefined),
     elements: parseElements(id, value.elements),
+    ground_truth_description: asString(
+      id,
+      value.ground_truth_description,
+      "ground_truth_description",
+    ),
     model_answer: asString(id, value.model_answer, "model_answer"),
   };
 
