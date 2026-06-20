@@ -1,5 +1,8 @@
 // Pure aggregation + pattern detection over DrinkEntry[]. Framework-free and
 // fully unit tested. All week/day math is UTC so results are deterministic.
+// NOTE: all day/week bucketing here is UTC-based (deterministic). The UI renders
+// individual entry timestamps in local time, so a late-night drink near a UTC
+// day boundary may bucket into the adjacent UTC day vs. its local calendar day.
 
 import { standardDrinksFor, type DrinkEntry } from "./types";
 

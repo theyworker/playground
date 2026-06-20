@@ -37,7 +37,7 @@ export function validateDrinkInput(body: unknown): ValidationResult {
     b.quantity <= 0 ||
     b.quantity > MAX_QUANTITY
   ) {
-    return { ok: false, error: `Quantity must be between 1 and ${MAX_QUANTITY}.` };
+    return { ok: false, error: `Quantity must be greater than 0 and at most ${MAX_QUANTITY}.` };
   }
   if (typeof b.setting !== "string" || b.setting.trim() === "") {
     return { ok: false, error: "Setting is required." };
