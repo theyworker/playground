@@ -9,6 +9,8 @@ declare global {
   var _alcoholMongoClientPromise: Promise<MongoClient> | undefined;
 }
 
+let prodClientPromise: Promise<MongoClient> | undefined;
+
 function clientPromise(): Promise<MongoClient> {
   if (!uri) {
     throw new Error("MONGODB_URI is not set");
@@ -19,7 +21,10 @@ function clientPromise(): Promise<MongoClient> {
     }
     return global._alcoholMongoClientPromise;
   }
-  return new MongoClient(uri).connect();
+  if (!prodClientPromise) {
+    prodClientPromise = new MongoClient(uri).connect();
+  }
+  return prodClientPromise;
 }
 
 export const DRINKS_COLLECTION = "drinks";
