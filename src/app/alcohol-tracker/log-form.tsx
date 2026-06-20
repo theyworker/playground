@@ -25,7 +25,7 @@ export default function LogForm({
 }) {
   const [type, setType] = useState<AlcoholType>("beer");
   const [quantity, setQuantity] = useState("1");
-  const [setting, setSetting] = useState(SETTINGS[0]);
+  const [setting, setSetting] = useState(SETTINGS[0] ?? "");
   const [category, setCategory] = useState<DrinkCategory>("friends");
   const [when, setWhen] = useState(nowLocal);
   const [note, setNote] = useState("");
@@ -36,8 +36,8 @@ export default function LogForm({
     e.preventDefault();
     setError(null);
     const qty = Number(quantity);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      setError("Enter how many drinks (a positive number).");
+    if (!Number.isFinite(qty) || qty < 0.5) {
+      setError("Enter at least 0.5 of a drink.");
       return;
     }
     setBusy(true);
@@ -114,7 +114,7 @@ export default function LogForm({
         <input id="note" className={fieldClass} type="text" value={note}
           placeholder="e.g. birthday dinner" onChange={(e) => setNote(e.target.value)} />
       </div>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
       <button type="submit" disabled={busy}
         className="w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:opacity-50">
         {busy ? "Saving…" : "Log drink"}
