@@ -1,38 +1,21 @@
-// Local-storage backed store for Dini's water game. The pure state model and
-// helpers now live in ./state; this module re-exports them so existing
-// importers keep working, and owns the browser store + persistence.
+// Server-backed store for Dini's water game. The pure state model lives in
+// ./state (re-exported here). State hydrates from /api/water on mount and is
+// persisted with a debounced PUT; if the network fails the game keeps working
+// in-memory.
 
 import { DEFAULT_STATE, sanitizeGameState, type GameState } from "./state";
 
 export * from "./state";
 
-const STORAGE_KEY = "dini-water-game-v1";
-
-function loadState(): GameState {
-  if (typeof window === "undefined") return { ...DEFAULT_STATE };
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_STATE };
-    return sanitizeGameState(JSON.parse(raw));
-  } catch {
-    return { ...DEFAULT_STATE };
-  }
-}
-
-function saveState(state: GameState): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // storage full / disabled — fail quietly, the UI still works in-memory
-  }
-}
-
-// ── External store, so React can read via useSyncExternalStore ──
+const PERSIST_DEBOUNCE_MS = 600;
 
 const SERVER_SNAPSHOT: GameState = { ...DEFAULT_STATE };
 let snapshot: GameState | null = null;
 const listeners = new Set<() => void>();
+
+let hydrateStarted = false;
+let dirty = false; // a local update happened — don't clobber it with a late GET
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function subscribe(cb: () => void): () => void {
   listeners.add(cb);
@@ -40,7 +23,7 @@ export function subscribe(cb: () => void): () => void {
 }
 
 export function getSnapshot(): GameState {
-  if (snapshot === null) snapshot = loadState();
+  if (snapshot === null) snapshot = { ...DEFAULT_STATE };
   return snapshot;
 }
 
@@ -48,10 +31,55 @@ export function getServerSnapshot(): GameState {
   return SERVER_SNAPSHOT;
 }
 
-/** Update game state functionally, persist it, and notify subscribers. */
+function notify(): void {
+  listeners.forEach((l) => l());
+}
+
+/** Load persisted state from the server once, after mount. */
+export function ensureHydrated(): void {
+  if (hydrateStarted || typeof window === "undefined") return;
+  hydrateStarted = true;
+  void hydrate();
+}
+
+async function hydrate(): Promise<void> {
+  try {
+    const res = await fetch("/api/water", { cache: "no-store" });
+    if (!res.ok) return;
+    const body = (await res.json()) as { state: GameState };
+    if (dirty) return; // user already interacted; keep their in-progress state
+    snapshot = sanitizeGameState(body.state);
+    notify();
+  } catch {
+    // offline / error — keep the default in-memory state
+  }
+}
+
+/** Update game state functionally, persist it (debounced), and notify. */
 export function updateState(updater: (prev: GameState) => GameState): void {
   const next = updater(getSnapshot());
   snapshot = next;
-  saveState(next);
-  listeners.forEach((l) => l());
+  dirty = true;
+  notify();
+  schedulePersist(next);
+}
+
+function schedulePersist(state: GameState): void {
+  if (typeof window === "undefined") return;
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    void persist(state);
+  }, PERSIST_DEBOUNCE_MS);
+}
+
+async function persist(state: GameState): Promise<void> {
+  try {
+    await fetch("/api/water", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    });
+  } catch {
+    // ignore — the optimistic in-memory state remains; next change retries
+  }
 }

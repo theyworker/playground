@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -13,6 +14,7 @@ import {
   countGoalsHit,
   DayLocation,
   DayLog,
+  ensureHydrated,
   getOrCreateDay,
   getServerSnapshot,
   getSnapshot,
@@ -44,6 +46,11 @@ function formatLitres(ml: number): string {
 
 export default function DiniWaterGame() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  useEffect(() => {
+    ensureHydrated();
+  }, []);
+
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalDraft, setGoalDraft] = useState("3");
   const [customMl, setCustomMl] = useState("");
@@ -391,7 +398,7 @@ export default function DiniWaterGame() {
         </button>
 
         <p className="text-center text-[11px] text-slate-400">
-          Your logs are saved only on this device.
+          Your logs sync to the cloud ☁️
         </p>
       </main>
 
