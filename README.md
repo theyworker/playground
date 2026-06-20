@@ -49,6 +49,11 @@ The page is client-rendered; `/api/alcohol` (list/create) and
 `/api/alcohol/[id]` (delete) are dynamic server routes that hold the
 connection and never expose it to the browser.
 
+The same `MONGODB_URI` / `MONGODB_DB` also back **Dini's Water Quest**
+(`/dini-water-game`), which persists its game state to the `water_state`
+collection via `/api/water` (GET to load, PUT to save). No extra config is
+needed beyond the variables above.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
