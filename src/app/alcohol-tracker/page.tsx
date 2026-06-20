@@ -54,7 +54,7 @@ export default function AlcoholTrackerPage() {
       </section>
 
       {error && (
-        <p className="mb-6 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">{error}</p>
+        <p role="alert" className="mb-6 rounded-lg bg-red-500/10 p-3 text-sm text-red-300">{error}</p>
       )}
 
       <section className="mb-10">
@@ -68,7 +68,7 @@ export default function AlcoholTrackerPage() {
 
       {entries.length > 0 && (
         <section>
-          <h2 className="mb-4 text-lg font-semibold">Recent ({entries.length})</h2>
+          <h2 className="mb-4 text-lg font-semibold">Recent ({Math.min(30, entries.length)} of {entries.length})</h2>
           <ul className="space-y-2">
             {entries.slice(0, 30).map((e) => (
               <li key={e.id}
@@ -82,6 +82,7 @@ export default function AlcoholTrackerPage() {
                   <div className="text-xs text-white/40">{formatWhen(e.consumedAt)}</div>
                 </div>
                 <button onClick={() => remove(e.id)}
+                  aria-label={`Delete ${TYPE_LABEL.get(e.type) ?? e.type} on ${formatWhen(e.consumedAt)}`}
                   className="ml-3 shrink-0 rounded-lg px-2 py-1 text-xs text-white/40 transition hover:bg-white/10 hover:text-red-300">
                   Delete
                 </button>

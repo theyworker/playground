@@ -100,7 +100,8 @@ export default function Dashboard({ entries }: { entries: DrinkEntry[] }) {
         <Bars title="By drink type" rows={types.map((t) => ({ key: t.key, value: t.standardDrinks, count: t.count }))}
           label={(k) => TYPE_LABEL.get(k as never) ?? k} />
         <Bars title="By day of week" rows={days.map((d) => ({ key: d.key, value: d.standardDrinks, count: d.count }))} />
-        <Bars title="Weekly trend" rows={weeks.map((w) => ({ key: w.weekStart, value: w.standardDrinks }))} />
+        <Bars title="Weekly trend" rows={weeks.map((w) => ({ key: w.weekStart, value: w.standardDrinks }))}
+          label={(k) => new Date(k).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
       </div>
     </div>
   );
