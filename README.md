@@ -35,6 +35,20 @@ OPENAI_SCORING_MODEL=gpt-4o      # optional; must support strict json_schema out
 The page itself stays statically prerendered; `/api/transcribe` and
 `/api/score` are dynamic server routes that hold the key.
 
+## Alcohol Tracker (env vars)
+
+The `/alcohol-tracker` feature logs drinking occasions to MongoDB. Add these to
+`.env.local` (never commit real values — `.env*` is gitignored):
+
+```bash
+MONGODB_URI=mongodb+srv://user:pass@cluster.example.mongodb.net   # required
+MONGODB_DB=alcohol_tracker                                        # optional; default "alcohol_tracker"
+```
+
+The page is client-rendered; `/api/alcohol` (list/create) and
+`/api/alcohol/[id]` (delete) are dynamic server routes that hold the
+connection and never expose it to the browser.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
