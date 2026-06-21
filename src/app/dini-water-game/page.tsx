@@ -398,7 +398,7 @@ export default function DiniWaterGame() {
         </button>
 
         <p className="text-center text-[11px] text-slate-400">
-          Your logs sync to the cloud ☁️
+          Your logs sync to the cloud when you&apos;re online ☁️
         </p>
       </main>
 

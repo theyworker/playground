@@ -74,12 +74,16 @@ function schedulePersist(state: GameState): void {
 
 async function persist(state: GameState): Promise<void> {
   try {
-    await fetch("/api/water", {
+    const res = await fetch("/api/water", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state),
     });
-  } catch {
-    // ignore — the optimistic in-memory state remains; next change retries
+    if (!res.ok) {
+      console.warn("[water] save failed:", res.status);
+    }
+  } catch (err) {
+    // offline / network error — optimistic in-memory state remains; next change retries
+    console.warn("[water] save failed:", err);
   }
 }
