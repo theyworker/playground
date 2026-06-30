@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap");
+
+.kade-air {
+  font-family: "Nunito", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.kade-air *,
+.kade-air *::before,
+.kade-air *::after {
+  box-sizing: border-box;
+}
+.kade-air ::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* press feedback (replaces the design's style-active) */
+.kade-air .press {
+  transition: transform 0.08s ease;
+}
+.kade-air .press:active {
+  transform: scale(0.97);
+}
+.kade-air .press-sm:active {
+  transform: scale(0.985);
+}
+
+@keyframes ka-spin { to { transform: rotate(360deg); } }
+@keyframes ka-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
+@keyframes ka-twinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes ka-drift { from { transform: translateX(0); } to { transform: translateX(40px); } }
+@keyframes ka-rainfall { to { background-position: 0 220px; } }
+@keyframes ka-flash { 0%, 92%, 100% { opacity: 0; } 94% { opacity: 0.55; } 96% { opacity: 0.1; } 98% { opacity: 0.4; } }
+@keyframes ka-fadeIn { from { transform: translateY(8px); } to { transform: none; } }
+@keyframes ka-floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes ka-confettiFall {
+  0% { transform: translateY(-10px) translateX(0) rotate(0); opacity: 1; }
+  100% { transform: translateY(900px) translateX(var(--dx, 0)) rotate(720deg); opacity: 0; }
+}
+@keyframes ka-pulsering {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+}
+@keyframes ka-glowpulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.95; } }
+@keyframes ka-shimmer { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.7; } }
